@@ -5,7 +5,7 @@ use polars::prelude::*;
 pub struct AnalysisMethods {}
 
 impl AnalysisToolKit for AnalysisMethods {
-    fn calculate_num_rows(&self, data: DataFrame) -> usize {
+    fn calculate_num_rows(&self, data: &DataFrame) -> usize {
         data.height()
     }
 }
@@ -21,6 +21,6 @@ mod tests {
         let methods = AnalysisMethods{};
         let frame: DataFrame = df!("data" => &["1", "2", "3"])
             .expect("We should see a df");
-        assert_eq!(methods.calculate_num_rows(frame), 3)
+        assert_eq!(methods.calculate_num_rows(&frame), 3)
     }
 }
