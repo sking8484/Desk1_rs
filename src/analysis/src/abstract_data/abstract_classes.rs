@@ -1,9 +1,12 @@
-use polars::{prelude::*, export::num::Zero};
-use ndarray::{Array1, Array2};
+use polars::{prelude::*, export::num::{Zero, FromPrimitive, Float}}; use ndarray::{Array1, Array2, RemoveAxis, Array, OwnedRepr};
 
 pub trait AnalysisToolKit {
     fn calculate_num_rows(&self, data: &DataFrame) -> usize;
     fn diagonalize_array<T>(&self, data: &Array1<T>) -> Array2<T>
-    where
-        T: Clone + Zero;
+        where
+            T: Clone + Zero;
+    fn calculate_std<T>(&self, data: &Array2<T>, axis: usize, ddof: T) -> Array1<T>
+        where 
+            T: Clone + Zero + FromPrimitive + Float;
 }
+
