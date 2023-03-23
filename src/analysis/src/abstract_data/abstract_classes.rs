@@ -1,8 +1,10 @@
 use std::{fmt::Debug, ops::Div};
 
 use ndarray::{
-    Array, Array1, Array2, DataMut, DataOwned, DimMax, Dimension, OwnedRepr, RemoveAxis,
+    Array, Array1, Array2, Data, DataMut, DataOwned, DimMax, Dimension, Ix2, OwnedRepr, RawData,
+    RemoveAxis,
 };
+use ndarray_linalg::*;
 use polars::{
     export::num::{Float, FromPrimitive, Zero},
     prelude::*,
@@ -22,4 +24,8 @@ pub trait AnalysisToolKit {
     where
         T: Clone + Zero + FromPrimitive + Float + Debug,
         D: Dimension + RemoveAxis;
+
+    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>)
+    where
+        T: FromPrimitive + Scalar + Lapack + Clone + Zero + Float + Debug;
 }

@@ -2,7 +2,10 @@ use std::{fmt::Debug, ops::Div};
 
 use crate::abstract_data::abstract_classes::AnalysisToolKit;
 pub mod abstract_data;
-use ndarray::{Array, Array1, Array2, Axis, DataMut, DataOwned, DimMax, Dimension, RemoveAxis};
+use ndarray::{
+    Array, Array1, Array2, Axis, DataMut, DataOwned, DimMax, Dimension, Ix2, RemoveAxis,
+};
+use ndarray_linalg::*;
 use polars::{
     export::num::{Float, FromPrimitive, Zero},
     prelude::*,
@@ -45,6 +48,21 @@ impl AnalysisToolKit for AnalysisMethods {
         }
         return return_matrix;
     }
+
+    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>)
+    where
+        T: Clone
+            + Zero
+            + FromPrimitive
+            + Float
+            + Debug
+            + ndarray_linalg::Scalar
+            + ndarray_linalg::Lapack,
+    {
+        let data = ndarray_linalg::svd::SVD::svd(matrix, true, true);
+        println!("{:?}", data)
+        
+    }
 }
 
 #[cfg(test)]
@@ -83,5 +101,11 @@ mod tests {
         let divided = methods.divide_matrices(&a, &b);
         let expected = arr2(&[[1., 1., 1.], [2., 2., 2.], [3., 3., 3.]]);
         assert_eq!(divided, expected)
+    }
+    #[test]
+    fn calculate_svd() {
+        let methods = AnalysisMethods {};
+        let a = arr2(&[[2., 2., 2.], [4., 4., 4.], [6., 6., 6.]]);
+        methods.calculate_svd(&a)
     }
 }
