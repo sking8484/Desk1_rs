@@ -1,9 +1,9 @@
-use std::{fmt::Debug, ops::Div};
+use std::{error::Error, fmt::Debug};
 
-use crate::abstract_data::abstract_classes::AnalysisToolKit;
+use crate::abstract_data::abstract_classes::{AnalysisToolKit, SVD};
 pub mod abstract_data;
 use ndarray::{
-    Array, Array1, Array2, Axis, DataMut, DataOwned, DimMax, Dimension, Ix2, RemoveAxis,
+    Array, Array1, Array2, Axis, Dimension, Ix2, RemoveAxis,
 };
 use ndarray_linalg::*;
 use polars::{
@@ -49,19 +49,27 @@ impl AnalysisToolKit for AnalysisMethods {
         return return_matrix;
     }
 
-    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>)
+    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>) -> Result<SVD<T>, Box<dyn Error>>
     where
         T: Clone
             + Zero
             + FromPrimitive
             + Float
             + Debug
-            + ndarray_linalg::Scalar
-            + ndarray_linalg::Lapack,
+            + ndarray_linalg::Lapack
+            + ndarray_linalg::Scalar<Real = T>,
     {
-        let data = ndarray_linalg::svd::SVD::svd(matrix, true, true);
-        println!("{:?}", data)
-        
+        let data = ndarray_linalg::svd::SVD::svd(matrix, true, true)?;
+        match data.0 {
+            None => panic!("We don't have any SVD Data"),
+            Some(..) => {
+                return Ok(SVD {
+                    u: data.0.unwrap(),
+                    s: data.1,
+                    vt: data.2.unwrap(),
+                })
+            }
+        }
     }
 }
 
@@ -106,6 +114,10 @@ mod tests {
     fn calculate_svd() {
         let methods = AnalysisMethods {};
         let a = arr2(&[[2., 2., 2.], [4., 4., 4.], [6., 6., 6.]]);
-        methods.calculate_svd(&a)
+        let result = methods.calculate_svd(&a);
+        match result {
+            Ok(..) => assert!(true),
+            Err(..) => assert!(false),
+        }
     }
 }

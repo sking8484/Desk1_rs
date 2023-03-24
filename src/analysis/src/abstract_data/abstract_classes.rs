@@ -1,7 +1,7 @@
-use std::{fmt::Debug, ops::Div};
+use std::{error::Error, fmt::Debug};
 
 use ndarray::{
-    Array, Array1, Array2, Data, DataMut, DataOwned, DimMax, Dimension, Ix2, OwnedRepr, RawData,
+    Array, Array1, Array2, Dimension, Ix1, Ix2,
     RemoveAxis,
 };
 use ndarray_linalg::*;
@@ -25,7 +25,21 @@ pub trait AnalysisToolKit {
         T: Clone + Zero + FromPrimitive + Float + Debug,
         D: Dimension + RemoveAxis;
 
-    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>)
+    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>) -> Result<SVD<T>, Box<dyn Error>>
     where
-        T: FromPrimitive + Scalar + Lapack + Clone + Zero + Float + Debug;
+        T: FromPrimitive
+            + Scalar
+            + Lapack
+            + Clone
+            + Zero
+            + Float
+            + Debug
+            + ndarray_linalg::Scalar<Real = T>;
+}
+
+#[derive(Debug)]
+pub struct SVD<T> {
+    pub u: Array<T, Ix2>,
+    pub s: Array<T, Ix1>,
+    pub vt: Array<T, Ix2>,
 }
