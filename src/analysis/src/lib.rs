@@ -3,7 +3,7 @@ use std::{error::Error, fmt::Debug};
 use crate::abstract_data::abstract_classes::{AnalysisToolKit, SVD};
 pub mod abstract_data;
 use ndarray::{
-    Array, Array1, Array2, Axis, Dimension, Ix2, RemoveAxis,
+    Array, Array1, Array2, Axis, Dimension, Ix2, RemoveAxis, s
 };
 use ndarray_linalg::*;
 use polars::{
@@ -49,7 +49,7 @@ impl AnalysisToolKit for AnalysisMethods {
         return return_matrix;
     }
 
-    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>) -> Result<SVD<T>, Box<dyn Error>>
+    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>) -> () //Result<SVD<T>, Box<dyn Error>>
     where
         T: Clone
             + Zero
@@ -59,17 +59,27 @@ impl AnalysisToolKit for AnalysisMethods {
             + ndarray_linalg::Lapack
             + ndarray_linalg::Scalar<Real = T>,
     {
-        let data = ndarray_linalg::svd::SVD::svd(matrix, true, true)?;
+        let data = ndarray_linalg::svd::SVD::svd(matrix, true, true)
+            .expect("Should have data");
+        let svd_output;
         match data.0 {
             None => panic!("We don't have any SVD Data"),
             Some(..) => {
-                return Ok(SVD {
+                svd_output =  SVD {
                     u: data.0.unwrap(),
                     s: data.1,
                     vt: data.2.unwrap(),
-                })
+                };
             }
         }
+        let s_iterator = svd_output.s.indexed_iter();
+        for (index, val) in s_iterator {
+            println!("{:?}, {:?}", index, val);
+            println!("Corresponding U Array: {:?}", svd_output.u.slice(s![.., index]));
+        }
+
+        return 
+
     }
 }
 
@@ -115,9 +125,9 @@ mod tests {
         let methods = AnalysisMethods {};
         let a = arr2(&[[2., 2., 2.], [4., 4., 4.], [6., 6., 6.]]);
         let result = methods.calculate_svd(&a);
-        match result {
-            Ok(..) => assert!(true),
-            Err(..) => assert!(false),
-        }
+        //match result {
+        //    Ok(..) => assert!(true),
+        //    Err(..) => assert!(false),
+        //}
     }
 }

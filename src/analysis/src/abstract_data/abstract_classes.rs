@@ -25,7 +25,7 @@ pub trait AnalysisToolKit {
         T: Clone + Zero + FromPrimitive + Float + Debug,
         D: Dimension + RemoveAxis;
 
-    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>) -> Result<SVD<T>, Box<dyn Error>>
+    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>) -> () // Result<SVD<T>, Box<dyn Error>>
     where
         T: FromPrimitive
             + Scalar
@@ -35,6 +35,7 @@ pub trait AnalysisToolKit {
             + Float
             + Debug
             + ndarray_linalg::Scalar<Real = T>;
+    //fn filter_svd_matrices<T>(&self, elementaryMatrices: Vec<&Array<T, Ix2>>, singularValues: Vec<&Array<T, Ix2>>, informationThreshold: f32) -> todo!();
 }
 
 #[derive(Debug)]
