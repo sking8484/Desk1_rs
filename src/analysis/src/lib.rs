@@ -76,15 +76,18 @@ impl AnalysisToolKit for AnalysisMethods {
         let s_iterator = svd_output.s.indexed_iter();
         let mut decomposition_vec = vec![];
         for (index, val) in s_iterator {
-            let new_matrix = svd_output.u.slice(s![.., index]).insert_axis(Axis(0)).t().dot(
+            let mut new_matrix = svd_output.u.slice(s![.., index]).insert_axis(Axis(0)).t().dot(
                 &svd_output.vt.slice(s![.., index]).insert_axis(Axis(1)).t()
             );
+            new_matrix = new_matrix.map(|x| *x * *val);
             decomposition_vec.push(DecompData {
                 singular_value: val.clone(),
                 decomp_matrix: new_matrix.clone()
             });
+            println!("{:?}", new_matrix)
         }
         svd_output.decomposition = Some(decomposition_vec);
+
         
 
         return Ok(svd_output)
