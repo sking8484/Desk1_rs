@@ -35,6 +35,13 @@ pub trait AnalysisToolKit {
             + Float
             + Debug
             + ndarray_linalg::Scalar<Real = T>;
+    //fn filter_svd_matrices<T>(&self, elementaryMatrices: Vec<&Array<T, Ix2>>, singularValues: Vec<&Array<T, Ix2>>, informationThreshold: f32) -> todo!();
+}
+
+#[derive(Debug)]
+pub struct DecompData<T> {
+    pub singular_value: T,
+    pub decomp_matrix: Array<T, Ix2>
 }
 
 #[derive(Debug)]
@@ -42,4 +49,5 @@ pub struct SVD<T> {
     pub u: Array<T, Ix2>,
     pub s: Array<T, Ix1>,
     pub vt: Array<T, Ix2>,
+    pub decomposition: Option<Vec<DecompData<T>>>
 }
