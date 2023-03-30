@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Debug};
 
-use crate::abstract_data::abstract_classes::{AnalysisToolKit, SVD};
+use crate::abstract_data::abstract_classes::{AnalysisToolKit, SVD, DecompData};
 pub mod abstract_data;
 use ndarray::{
     Array, Array1, Array2, Axis, Dimension, Ix2, RemoveAxis, s
@@ -49,7 +49,7 @@ impl AnalysisToolKit for AnalysisMethods {
         return return_matrix;
     }
 
-    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>) -> () //Result<SVD<T>, Box<dyn Error>>
+    fn calculate_svd<T>(&self, matrix: &Array<T, Ix2>) -> Result<SVD<T>, Box<dyn Error>>
     where
         T: Clone
             + Zero
@@ -61,7 +61,7 @@ impl AnalysisToolKit for AnalysisMethods {
     {
         let data = ndarray_linalg::svd::SVD::svd(matrix, true, true)
             .expect("Should have data");
-        let svd_output;
+        let mut svd_output;
         match data.0 {
             None => panic!("We don't have any SVD Data"),
             Some(..) => {
@@ -69,16 +69,25 @@ impl AnalysisToolKit for AnalysisMethods {
                     u: data.0.unwrap(),
                     s: data.1,
                     vt: data.2.unwrap(),
+                    decomposition: None
                 };
             }
         }
         let s_iterator = svd_output.s.indexed_iter();
+        let mut decomposition_vec = vec![];
         for (index, val) in s_iterator {
-            println!("{:?}, {:?}", index, val);
-            println!("Corresponding U Array: {:?}", svd_output.u.slice(s![.., index]));
+            let new_matrix = svd_output.u.slice(s![.., index]).insert_axis(Axis(0)).t().dot(
+                &svd_output.vt.slice(s![.., index]).insert_axis(Axis(1)).t()
+            );
+            decomposition_vec.push(DecompData {
+                singular_value: val.clone(),
+                decomp_matrix: new_matrix.clone()
+            });
         }
+        svd_output.decomposition = Some(decomposition_vec);
+        
 
-        return 
+        return Ok(svd_output)
 
     }
 }
@@ -125,9 +134,9 @@ mod tests {
         let methods = AnalysisMethods {};
         let a = arr2(&[[2., 2., 2.], [4., 4., 4.], [6., 6., 6.]]);
         let result = methods.calculate_svd(&a);
-        //match result {
-        //    Ok(..) => assert!(true),
-        //    Err(..) => assert!(false),
-        //}
+        match result {
+            Ok(..) => assert!(true),
+            Err(..) => assert!(false),
+        }
     }
 }
