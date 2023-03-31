@@ -34,7 +34,8 @@ pub trait AnalysisToolKit {
             + Zero
             + Float
             + Debug
-            + ndarray_linalg::Scalar<Real = T>;
+            + ndarray_linalg::Scalar<Real = T>
+            + nalgebra::ComplexField;
     //fn filter_svd_matrices<T>(&self, elementaryMatrices: Vec<&Array<T, Ix2>>, singularValues: Vec<&Array<T, Ix2>>, informationThreshold: f32) -> todo!();
 }
 

@@ -10,6 +10,8 @@ use polars::{
     export::num::{Float, FromPrimitive, Zero},
     prelude::*,
 };
+use nalgebra::*;
+
 
 pub struct AnalysisMethods {}
 
@@ -57,8 +59,15 @@ impl AnalysisToolKit for AnalysisMethods {
             + Float
             + Debug
             + ndarray_linalg::Lapack
-            + ndarray_linalg::Scalar<Real = T>,
+            + ndarray_linalg::Scalar<Real = T>
+            + nalgebra::ComplexField
     {
+        let cloned_data = matrix.clone().into_iter();
+        let nalgebra_mat = nalgebra::DMatrix::from_iterator(matrix.nrows(), matrix.ncols(), cloned_data);
+        let decomp = nalgebra::linalg::SVD::new(nalgebra_mat, true, true);
+        println!("nalgebra_matrix: {:?}", decomp);
+        println!("recomposed: {:?}", decomp.recompose());
+
         let data = ndarray_linalg::svd::SVD::svd(matrix, true, true)
             .expect("Should have data");
         let mut svd_output;
@@ -84,7 +93,6 @@ impl AnalysisToolKit for AnalysisMethods {
                 singular_value: val.clone(),
                 decomp_matrix: new_matrix.clone()
             });
-            println!("{:?}", new_matrix)
         }
         svd_output.decomposition = Some(decomposition_vec);
 
@@ -135,7 +143,7 @@ mod tests {
     #[test]
     fn calculate_svd() {
         let methods = AnalysisMethods {};
-        let a = arr2(&[[2., 2., 2.], [4., 4., 4.], [6., 6., 6.]]);
+        let a = arr2(&[[2., 5., 2.], [4., 3., 4.], [6., 8., 1.]]);
         let result = methods.calculate_svd(&a);
         match result {
             Ok(..) => assert!(true),
