@@ -1,3 +1,3 @@
 fn main() {
-    println!("Hello Docker!");
+    println!("Hello Docker V2!");
 }
