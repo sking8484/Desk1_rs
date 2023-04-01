@@ -10,6 +10,8 @@ use polars::{
     export::num::{Float, FromPrimitive, Zero},
     prelude::*,
 };
+use nalgebra::*;
+
 
 pub struct AnalysisMethods {}
 
@@ -57,38 +59,39 @@ impl AnalysisToolKit for AnalysisMethods {
             + Float
             + Debug
             + ndarray_linalg::Lapack
-            + ndarray_linalg::Scalar<Real = T>,
+            + ndarray_linalg::Scalar<Real = T>
+            + nalgebra::ComplexField<RealField = T>
     {
-        let data = ndarray_linalg::svd::SVD::svd(matrix, true, true)
-            .expect("Should have data");
+        let cloned_data = matrix.clone().into_iter();
+        let nalgebra_mat = nalgebra::DMatrix::from_iterator(matrix.nrows(), matrix.ncols(), cloned_data);
+        let data = nalgebra::linalg::SVD::new(nalgebra_mat, true, true);
+
         let mut svd_output;
-        match data.0 {
+        match data.u {
             None => panic!("We don't have any SVD Data"),
             Some(..) => {
                 svd_output =  SVD {
-                    u: data.0.unwrap(),
-                    s: data.1,
-                    vt: data.2.unwrap(),
+                    u: data.u.unwrap(),
+                    s: data.singular_values,
+                    vt: data.v_t.unwrap(),
                     decomposition: None
                 };
             }
         }
-        let s_iterator = svd_output.s.indexed_iter();
+        let s_iterator = svd_output.s.iter();
         let mut decomposition_vec = vec![];
-        for (index, val) in s_iterator {
-            let mut new_matrix = svd_output.u.slice(s![.., index]).insert_axis(Axis(0)).t().dot(
-                &svd_output.vt.slice(s![.., index]).insert_axis(Axis(1)).t()
-            );
-            new_matrix = new_matrix.map(|x| *x * *val);
+        let mut i = 0;
+        for val in s_iterator {
+            let new_matrix = (svd_output.u.column(i)*
+                svd_output.vt.row(i))**val;
+            println!("New Matrix: {:}", new_matrix);
             decomposition_vec.push(DecompData {
                 singular_value: val.clone(),
                 decomp_matrix: new_matrix.clone()
             });
-            println!("{:?}", new_matrix)
+            i += 1;
         }
         svd_output.decomposition = Some(decomposition_vec);
-
-        
 
         return Ok(svd_output)
 

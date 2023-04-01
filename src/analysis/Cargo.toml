@@ -9,3 +9,6 @@ edition = "2021"
 polars = "0.27.2"
 ndarray = "0.15.6"
 ndarray-linalg = { version = "0.16.0", features = ["openblas"]}
+nalgebra = "0.32.2"
+
+

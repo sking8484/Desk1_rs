@@ -1,7 +1,8 @@
 use std::{error::Error, fmt::Debug};
 
+use nalgebra::{DMatrix, DVector, RealField, ComplexField};
 use ndarray::{
-    Array, Array1, Array2, Dimension, Ix1, Ix2,
+    Array, Array1, Array2, Dimension, Ix2,
     RemoveAxis,
 };
 use ndarray_linalg::*;
@@ -34,20 +35,22 @@ pub trait AnalysisToolKit {
             + Zero
             + Float
             + Debug
-            + ndarray_linalg::Scalar<Real = T>;
+            + ndarray_linalg::Scalar<Real = T>
+            + nalgebra::ComplexField<RealField = T>;
     //fn filter_svd_matrices<T>(&self, elementaryMatrices: Vec<&Array<T, Ix2>>, singularValues: Vec<&Array<T, Ix2>>, informationThreshold: f32) -> todo!();
 }
 
 #[derive(Debug)]
 pub struct DecompData<T> {
     pub singular_value: T,
-    pub decomp_matrix: Array<T, Ix2>
+    pub decomp_matrix: DMatrix<T>
 }
 
 #[derive(Debug)]
-pub struct SVD<T> {
-    pub u: Array<T, Ix2>,
-    pub s: Array<T, Ix1>,
-    pub vt: Array<T, Ix2>,
+pub struct SVD<T> 
+    where T: ComplexField {
+    pub u: DMatrix<T>,
+    pub s: DVector<T::RealField>,
+    pub vt: DMatrix<T>,
     pub decomposition: Option<Vec<DecompData<T>>>
 }
