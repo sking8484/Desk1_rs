@@ -1,0 +1,4 @@
+[v1]
+"cargo-expand 1.0.31 (registry+https://github.com/rust-lang/crates.io-index)" = ["cargo-expand"]
+"diesel_cli 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = ["diesel"]
+"ripgrep 13.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = ["rg"]
