@@ -1,23 +1,20 @@
 use std::{error::Error, fmt::Debug};
 
-use crate::abstract_data::abstract_classes::{AnalysisToolKit, SVD, DecompData};
+use crate::abstract_data::abstract_classes::{AnalysisToolKit, DecompData, SVD};
 pub mod abstract_data;
-use ndarray::{
-    Array, Array1, Array2, Axis, Dimension, Ix2, RemoveAxis, s
-};
+use nalgebra::*;
+use ndarray::{s, Array, Array1, Array2, Axis, Dimension, Ix2, RemoveAxis};
 use ndarray_linalg::*;
 use polars::{
     export::num::{Float, FromPrimitive, Zero},
     prelude::*,
 };
-use nalgebra::*;
-
 
 pub struct AnalysisMethods {}
 
 impl AnalysisToolKit for AnalysisMethods {
-    fn calculate_num_rows(&self, data: &DataFrame) -> usize {
-        data.height()
+    fn calculate_num_rows<T>(&self, data: &DMatrix<T>) -> usize {
+        data.nrows()
     }
     fn diagonalize_array<T>(&self, data: &Array1<T>) -> Array2<T>
     where
@@ -60,21 +57,22 @@ impl AnalysisToolKit for AnalysisMethods {
             + Debug
             + ndarray_linalg::Lapack
             + ndarray_linalg::Scalar<Real = T>
-            + nalgebra::ComplexField<RealField = T>
+            + nalgebra::ComplexField<RealField = T>,
     {
         let cloned_data = matrix.clone().into_iter();
-        let nalgebra_mat = nalgebra::DMatrix::from_iterator(matrix.nrows(), matrix.ncols(), cloned_data);
+        let nalgebra_mat =
+            nalgebra::DMatrix::from_iterator(matrix.nrows(), matrix.ncols(), cloned_data);
         let data = nalgebra::linalg::SVD::new(nalgebra_mat, true, true);
 
         let mut svd_output;
         match data.u {
             None => panic!("We don't have any SVD Data"),
             Some(..) => {
-                svd_output =  SVD {
+                svd_output = SVD {
                     u: data.u.unwrap(),
                     s: data.singular_values,
                     vt: data.v_t.unwrap(),
-                    decomposition: None
+                    decomposition: None,
                 };
             }
         }
@@ -82,19 +80,17 @@ impl AnalysisToolKit for AnalysisMethods {
         let mut decomposition_vec = vec![];
         let mut i = 0;
         for val in s_iterator {
-            let new_matrix = (svd_output.u.column(i)*
-                svd_output.vt.row(i))**val;
+            let new_matrix = (svd_output.u.column(i) * svd_output.vt.row(i)) * *val;
             println!("New Matrix: {:}", new_matrix);
             decomposition_vec.push(DecompData {
                 singular_value: val.clone(),
-                decomp_matrix: new_matrix.clone()
+                decomp_matrix: new_matrix.clone(),
             });
             i += 1;
         }
         svd_output.decomposition = Some(decomposition_vec);
 
-        return Ok(svd_output)
-
+        return Ok(svd_output);
     }
 }
 
@@ -106,8 +102,8 @@ mod tests {
     #[test]
     fn calc_num_rows() {
         let methods = AnalysisMethods {};
-        let frame: DataFrame = df!("data" => &["1", "2", "3"]).expect("We should see a df");
-        assert_eq!(methods.calculate_num_rows(&frame), 3)
+        let matrix = DMatrix::from_vec(3, 3, vec![1., 1., 1., 2., 2., 2., 3., 3., 3.]);
+        assert_eq!(methods.calculate_num_rows(&matrix), 3)
     }
 
     #[test]

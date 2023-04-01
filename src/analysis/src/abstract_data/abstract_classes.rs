@@ -1,10 +1,7 @@
 use std::{error::Error, fmt::Debug};
 
-use nalgebra::{DMatrix, DVector, RealField, ComplexField};
-use ndarray::{
-    Array, Array1, Array2, Dimension, Ix2,
-    RemoveAxis,
-};
+use nalgebra::{ComplexField, DMatrix, DVector, RealField};
+use ndarray::{Array, Array1, Array2, Dimension, Ix2, RemoveAxis};
 use ndarray_linalg::*;
 use polars::{
     export::num::{Float, FromPrimitive, Zero},
@@ -12,7 +9,7 @@ use polars::{
 };
 
 pub trait AnalysisToolKit {
-    fn calculate_num_rows(&self, data: &DataFrame) -> usize;
+    fn calculate_num_rows<T>(&self, data: &DMatrix<T>) -> usize;
     fn diagonalize_array<T>(&self, data: &Array1<T>) -> Array2<T>
     where
         T: Clone + Zero;
@@ -43,14 +40,16 @@ pub trait AnalysisToolKit {
 #[derive(Debug)]
 pub struct DecompData<T> {
     pub singular_value: T,
-    pub decomp_matrix: DMatrix<T>
+    pub decomp_matrix: DMatrix<T>,
 }
 
 #[derive(Debug)]
-pub struct SVD<T> 
-    where T: ComplexField {
+pub struct SVD<T>
+where
+    T: ComplexField,
+{
     pub u: DMatrix<T>,
     pub s: DVector<T::RealField>,
     pub vt: DMatrix<T>,
-    pub decomposition: Option<Vec<DecompData<T>>>
+    pub decomposition: Option<Vec<DecompData<T>>>,
 }
