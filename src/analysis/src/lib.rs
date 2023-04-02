@@ -9,6 +9,7 @@ use polars::{
     export::num::{Float, FromPrimitive, Zero},
     prelude::*,
 };
+use simba::scalar::SupersetOf;
 
 pub struct AnalysisMethods {}
 
@@ -16,19 +17,17 @@ impl AnalysisToolKit for AnalysisMethods {
     fn calculate_num_rows<T>(&self, data: &DMatrix<T>) -> usize {
         data.nrows()
     }
-    fn diagonalize_array<T>(&self, data: &Array1<T>) -> Array2<T>
-    where
-        T: Clone + Zero,
+    fn diagonalize_array<T>(&self, data: &DVector<T>) -> DMatrix<T>
+    where T: nalgebra::Scalar + Zero
     {
-        let diagonal_matrix: Array2<T> = Array2::from_diag(&data);
+        let diagonal_matrix = DMatrix::from_diagonal(&data);
         diagonal_matrix
     }
-    fn calculate_std<T, D>(&self, data: &Array<T, D>, axis: usize, ddof: T) -> Array<T, D::Smaller>
+    fn calculate_row_std<T>(&self, data: &DMatrix<T>) -> RowOVector<T, Dyn>
     where
-        T: Clone + Zero + FromPrimitive + Float,
-        D: Dimension + RemoveAxis,
+        T: RealField + Float
     {
-        return data.std_axis(Axis(axis), ddof);
+        data.row_variance().map(|x| Float::sqrt(x))
     }
     fn divide_matrices<T, D>(&self, lhs: &Array<T, D>, rhs: &Array<T, D>) -> Array<T, D>
     where
@@ -109,17 +108,25 @@ mod tests {
     #[test]
     fn diagonalize_array() {
         let methods = AnalysisMethods {};
-        let array = arr1(&[1, 2]);
+        let array = DVector::from_fn(3, |i, _| i+1);
         let diagonals = methods.diagonalize_array(&array);
-        assert_eq!(diagonals, arr2(&[[1, 0], [0, 2]]))
+        assert_eq!(diagonals, DMatrix::from_vec(3, 3, vec![
+            1, 0, 0,
+            0, 2, 0,
+            0, 0, 3
+        ]));
     }
 
     #[test]
     fn calculate_std() {
         let methods = AnalysisMethods {};
-        let a = arr2(&[[1., 2.], [3., 4.], [5., 6.]]);
-        let stddev = methods.calculate_std(&a, 0, 1.);
-        assert_eq!(stddev, aview1(&[2., 2.]));
+        let matrix = DMatrix::from_vec(3, 3, vec![
+            1., 1., 1., 
+            1., 1., 1.,
+            1., 1., 1.
+        ]);
+        let stddev = methods.calculate_row_std(&matrix);
+        assert_eq!(stddev, DVector::from_fn(3, |i, _| 0.0).transpose());
     }
 
     #[test]

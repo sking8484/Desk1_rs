@@ -37,7 +37,9 @@ dependencies = [
  "nalgebra",
  "ndarray",
  "ndarray-linalg",
+ "num-traits",
  "polars",
+ "simba",
 ]
 
 [[package]]
