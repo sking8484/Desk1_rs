@@ -66,6 +66,35 @@ impl AnalysisToolKit for AnalysisMethods {
 
         return Ok(svd_output);
     }
+    fn filter_svd_matrices<T>(&self, matrices: &Vec<DMatrix<T>>, singular_values: &DVector<T::RealField>, informationThreshold: f64) -> Option<DMatrix<T>>
+        where
+            T: Float + RealField + Scalar {
+        let sum_squared = singular_values.map(|i| i*i).
+            sum();
+        let scaled_values = singular_values.map(|i| (i*i)/sum_squared);
+
+        let mut filtered_matrix: Option<DMatrix<T>> = None;
+
+        let mut information = 0.0;
+        let mut index = 0;
+        for matrix in matrices.iter() {
+            if information > informationThreshold {
+                break;
+            }
+            match index {
+                0 => {
+                    filtered_matrix = Some(matrix.clone());
+                }
+                _ => {
+                    filtered_matrix = Some(filtered_matrix.unwrap() + matrix);
+                },
+                
+            };
+            information += num_traits::cast::ToPrimitive::to_f64(&scaled_values[index]).unwrap();
+            index += 1;
+        }
+        return filtered_matrix;
+    }
 }
 
 #[cfg(test)]
