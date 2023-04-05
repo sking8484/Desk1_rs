@@ -168,4 +168,58 @@ mod tests {
             Err(..) => assert!(false),
         }
     }
+    #[test]
+    fn filter_matrices() {
+        let methods = AnalysisMethods{};
+        let matrices = vec![
+            DMatrix::from_vec(3, 3, vec![
+                1., 1., 1.,
+                1., 1., 1.,
+                1., 1., 1.
+            ]),
+            DMatrix::from_vec(3, 3, vec![
+                1., 1., 1.,
+                1., 1., 1.,
+                1., 1., 1.
+            ])
+        ];
+
+        let singular_values = DVector::from_vec(vec![0.1, 0., 0.]);
+        let threshold = 0.5;
+
+        let result = methods.filter_svd_matrices(&matrices, &singular_values, threshold);
+        assert_eq!(result.unwrap(), DMatrix::from_vec(3, 3, vec![
+                1., 1., 1.,
+                1., 1., 1.,
+                1., 1., 1.
+            ]) 
+        );
+        let matrices = vec![
+            DMatrix::from_vec(3, 3, vec![
+                1., 1., 1.,
+                1., 1., 1.,
+                1., 1., 1.
+            ]),
+            DMatrix::from_vec(3, 3, vec![
+                1., 1., 1.,
+                1., 1., 1.,
+                1., 1., 1.
+            ])
+        ];
+
+        let singular_values = DVector::from_vec(vec![0.1, 0.2, 0.]);
+        let threshold = 0.8;
+
+        let result = methods.filter_svd_matrices(&matrices, &singular_values, threshold);
+        assert_eq!(result.unwrap(), DMatrix::from_vec(3, 3, vec![
+                2., 2., 2.,
+                2., 2., 2.,
+                2., 2., 2.
+            ]) 
+        );
+
+
+
+        
+    }
 }
