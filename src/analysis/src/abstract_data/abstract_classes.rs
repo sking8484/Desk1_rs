@@ -3,6 +3,8 @@ use std::{error::Error, fmt::Debug};
 use nalgebra::{ComplexField, DMatrix, DVector, RealField, RowOVector, Dyn};
 use num::Float;
 use num_traits::identities::Zero;
+use smartcore::linalg::basic::matrix::DenseMatrix;
+use smartcore::linear::linear_regression::*;
 
 pub trait AnalysisToolKit {
     fn calculate_num_rows<T>(&self, data: &DMatrix<T>) -> usize;
@@ -22,6 +24,8 @@ pub trait AnalysisToolKit {
     fn filter_svd_matrices<T>(&self, matrices: &Vec<DMatrix<T>>, values: &DVector<T::RealField>, informationThreshold: f64) -> Option<DMatrix<T>>
     where
         T: Float + RealField;
+    fn run_regression<T>(&self, independent_variables: &DMatrix<T>, dependent_variables: &DVector<T>, eps:T)
+        where T: Float + RealField;
 }
 
 #[derive(Debug)]

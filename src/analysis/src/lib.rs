@@ -6,6 +6,10 @@ use nalgebra::*;
 
 use num::Float;
 use num_traits::identities::Zero;
+use smartcore::linalg::basic::arrays::Array;
+use smartcore::linalg::basic::matrix::DenseMatrix;
+use smartcore::linear::linear_regression::*;
+use ndarray::ArrayBase;
 
 pub struct AnalysisMethods {}
 
@@ -95,6 +99,14 @@ impl AnalysisToolKit for AnalysisMethods {
         }
         return filtered_matrix;
     }
+    fn run_regression<T>(&self, independent_variables: &DMatrix<T>, dependent_variables: &DVector<T>, eps: T)
+        where T: Float + RealField {
+        let A = independent_variables.clone();
+        let b = dependent_variables.clone();
+        let x = (A.transpose()*A.clone()).pseudo_inverse(eps).unwrap()*(A.transpose()*b);
+        println!("{:}", x);
+    }
+    
 }
 
 #[cfg(test)]
@@ -162,7 +174,6 @@ mod tests {
             6., 6., 6.
         ]);
         let result = methods.calculate_svd(&mat);
-        println!("{:?}", result);
         match result {
             Ok(..) => assert!(true),
             Err(..) => assert!(false),
@@ -217,9 +228,12 @@ mod tests {
                 2., 2., 2.
             ]) 
         );
-
-
-
-        
+    }
+    #[test]
+    fn test_linregress() {
+        let methods = AnalysisMethods {};
+        let indep = DMatrix::from_vec(3, 2, vec![1., 3., 5., 2., 4., 6.]);
+        let dep = DVector::from_vec(vec![5., 11., 17.]);
+        methods.run_regression(&indep, &dep, 0.001);
     }
 }
