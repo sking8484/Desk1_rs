@@ -66,6 +66,35 @@ impl AnalysisToolKit for AnalysisMethods {
 
         return Ok(svd_output);
     }
+    fn filter_svd_matrices<T>(&self, matrices: &Vec<DMatrix<T>>, singular_values: &DVector<T::RealField>, informationThreshold: f64) -> Option<DMatrix<T>>
+        where
+            T: Float + RealField + Scalar {
+        let sum_squared = singular_values.map(|i| i*i).
+            sum();
+        let scaled_values = singular_values.map(|i| (i*i)/sum_squared);
+
+        let mut filtered_matrix: Option<DMatrix<T>> = None;
+
+        let mut information = 0.0;
+        let mut index = 0;
+        for matrix in matrices.iter() {
+            if information > informationThreshold {
+                break;
+            }
+            match index {
+                0 => {
+                    filtered_matrix = Some(matrix.clone());
+                }
+                _ => {
+                    filtered_matrix = Some(filtered_matrix.unwrap() + matrix);
+                },
+                
+            };
+            information += num_traits::cast::ToPrimitive::to_f64(&scaled_values[index]).unwrap();
+            index += 1;
+        }
+        return filtered_matrix;
+    }
 }
 
 #[cfg(test)]
@@ -138,5 +167,59 @@ mod tests {
             Ok(..) => assert!(true),
             Err(..) => assert!(false),
         }
+    }
+    #[test]
+    fn filter_matrices() {
+        let methods = AnalysisMethods{};
+        let matrices = vec![
+            DMatrix::from_vec(3, 3, vec![
+                1., 1., 1.,
+                1., 1., 1.,
+                1., 1., 1.
+            ]),
+            DMatrix::from_vec(3, 3, vec![
+                1., 1., 1.,
+                1., 1., 1.,
+                1., 1., 1.
+            ])
+        ];
+
+        let singular_values = DVector::from_vec(vec![0.1, 0., 0.]);
+        let threshold = 0.5;
+
+        let result = methods.filter_svd_matrices(&matrices, &singular_values, threshold);
+        assert_eq!(result.unwrap(), DMatrix::from_vec(3, 3, vec![
+                1., 1., 1.,
+                1., 1., 1.,
+                1., 1., 1.
+            ]) 
+        );
+        let matrices = vec![
+            DMatrix::from_vec(3, 3, vec![
+                1., 1., 1.,
+                1., 1., 1.,
+                1., 1., 1.
+            ]),
+            DMatrix::from_vec(3, 3, vec![
+                1., 1., 1.,
+                1., 1., 1.,
+                1., 1., 1.
+            ])
+        ];
+
+        let singular_values = DVector::from_vec(vec![0.1, 0.2, 0.]);
+        let threshold = 0.8;
+
+        let result = methods.filter_svd_matrices(&matrices, &singular_values, threshold);
+        assert_eq!(result.unwrap(), DMatrix::from_vec(3, 3, vec![
+                2., 2., 2.,
+                2., 2., 2.,
+                2., 2., 2.
+            ]) 
+        );
+
+
+
+        
     }
 }

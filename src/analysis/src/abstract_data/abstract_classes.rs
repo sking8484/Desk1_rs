@@ -19,7 +19,9 @@ pub trait AnalysisToolKit {
     fn calculate_svd<T>(&self, matrix: &DMatrix<T>) -> Result<SVD<T>, Box<dyn Error>>
     where
         T: nalgebra::ComplexField<RealField = T> + Copy;
-    //fn filter_svd_matrices<T>(&self, elementaryMatrices: Vec<&Array<T, Ix2>>, singularValues: Vec<&Array<T, Ix2>>, informationThreshold: f32) -> todo!();
+    fn filter_svd_matrices<T>(&self, matrices: &Vec<DMatrix<T>>, values: &DVector<T::RealField>, informationThreshold: f64) -> Option<DMatrix<T>>
+    where
+        T: Float + RealField;
 }
 
 #[derive(Debug)]
