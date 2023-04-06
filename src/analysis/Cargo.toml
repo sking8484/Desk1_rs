@@ -10,5 +10,4 @@ nalgebra = "0.32.2"
 num-traits = "0.2.15"
 simba = "0.8.0"
 num = "0.4.0"
-smartcore = { version = "0.3.1", features = ['ndarray-bindings']}
-ndarray = "0.15.6"
+polars = {version = "0.28.0", features = ['pct_change']}
