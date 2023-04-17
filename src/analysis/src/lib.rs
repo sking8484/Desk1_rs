@@ -2,6 +2,7 @@ use std::{error::Error, fmt::Debug};
 
 use crate::abstract_data::abstract_classes::{AnalysisToolKit, DecompData, SVD, DataSettings};
 pub mod abstract_data;
+use abstract_data::abstract_classes::RegressionCoefficients;
 use nalgebra::*;
 
 use num::Float;
@@ -96,12 +97,16 @@ impl AnalysisToolKit for AnalysisMethods {
         }
         return filtered_matrix;
     }
-    fn fit_regression<T>(&self, independent_variables: &DMatrix<T>, dependent_variables: &DVector<T>, eps: T) -> DVector<f64>
+    fn fit_regression<T>(&self, independent_variables: &DMatrix<T>, dependent_variables: &DVector<T>, eps: T) -> RegressionCoefficients
         where T: Float + RealField {
         let A = independent_variables.clone();
         let b = dependent_variables.clone();
         let x = (A.transpose()*A.clone()).pseudo_inverse(eps).unwrap()*(A.transpose()*b);
         return x.map(|i| Float::round(num_traits::ToPrimitive::to_f64(&i).unwrap()*100.0)/100.0);
+    }
+    fn create_predictions(&self, coefficients: RegressionCoefficients, independent_variables: &DMatrix<T>) {
+        let output = coefficients.coefficients.transpose().dot(independent_variables);
+        println!("{}", output);
     }
     fn clean_data(&self, df: DataFrame, settings: DataSettings) -> DataFrame {
         let mut return_df = df;
