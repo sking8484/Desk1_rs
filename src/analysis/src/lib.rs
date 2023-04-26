@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Debug};
 
-use crate::abstract_data::abstract_classes::{AnalysisToolKit, DecompData, SVD, DataSettings};
+use crate::abstract_data::abstract_classes::{AnalysisToolKit, DecompData, SVD, DataSettings, MSSA};
 pub mod abstract_data;
 use nalgebra::*;
 
@@ -121,8 +121,34 @@ impl AnalysisToolKit for AnalysisMethods {
     }
 }
 
+// Spectrum Analysis Implementation
+
+pub struct SpectrumAnalysis {
+    pub data: DataFrame,
+    pub l: i64,
+    pub look_back: i64,
+    pub information_threshold: f64
+}
+
+impl SpectrumAnalysis {
+    fn new(data: DataFrame, l: i64, mut look_back: i64, information_threshold:f64) -> Self {
+        if look_back == 0 {
+            look_back = num_traits::ToPrimitive::to_i64(&data.shape().0).unwrap();
+        }
+        if look_back % l != 0 {
+            panic!("Lookback and l are not comapitable")
+        }
+        Self {data, l, look_back, information_threshold}
+    }
+}
+
+impl MSSA for SpectrumAnalysis {
+
+}
+
+
 #[cfg(test)]
-mod tests {
+mod test_analysis {
     use super::*;
 
     #[test]
@@ -261,5 +287,21 @@ mod tests {
         "price" => &["12.21", "12.22"]).unwrap();
         let result = methods.clean_data(data, settings);
         assert_eq!(result, df!("price" => &["12.22"]).unwrap())
+    }
+}
+
+#[cfg(test)]
+mod test_spectrum {
+    use super::*;
+
+    #[test]
+    fn test_spectrum_initialization() {
+        let data = df!("date" => &["12/21/2021", "12/21/2022"],
+        "price" => &["12.21", "12.22"]).unwrap();
+        let spectrum = SpectrumAnalysis::new(data.clone(), 100, 1000, 0.95); 
+        assert_eq!(spectrum.l, 100);
+        let spectrum = SpectrumAnalysis::new(data.clone(), 2, 0, 0.95);
+        assert_eq!(spectrum.look_back, num_traits::ToPrimitive::to_i64(&data.shape().0).unwrap());
+
     }
 }
