@@ -23,10 +23,11 @@ pub trait AnalysisToolKit {
     fn filter_svd_matrices<T>(&self, matrices: &Vec<DMatrix<T>>, values: &DVector<T::RealField>, information_threshold: f64) -> Option<DMatrix<T>>
     where
         T: Float + RealField;
-    fn fit_regression<T>(&self, independent_variables: &DMatrix<T>, dependent_variables: &DVector<T>, eps:T) -> RegressionCoefficients
+    fn fit_regression<T>(&self, independent_variables: &DMatrix<T>, dependent_variables: &DVector<T>, eps:T) -> DVector<f64>
         where T: Float + RealField;
     fn clean_data(&self, df: DataFrame, settings: DataSettings) -> DataFrame;
-    fn create_predictions(&self, coefficients: RegressionCoefficients, independent_variables: &DMatrix<T>);
+    fn create_predictions<T>(&self, coefficients: &DVector<T>, independent_variables: &DMatrix<T>) -> DVector<T>
+        where T: Float + RealField;
 }
 
 #[derive(Debug)]
@@ -53,7 +54,4 @@ pub struct DataSettings {
     pub remove_date_col: bool
 }
 
-#[derive(Debug)]
-pub struct RegressionCoefficients {
-    pub coefficients: &DVector<f64>
-}
+
