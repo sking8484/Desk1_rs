@@ -1,11 +1,12 @@
 use std::{error::Error, fmt::Debug};
 
-use crate::abstract_data::abstract_classes::{AnalysisToolKit, DecompData, SVD};
+use crate::abstract_data::abstract_classes::{AnalysisToolKit, DecompData, SVD, DataSettings};
 pub mod abstract_data;
 use nalgebra::*;
 
 use num::Float;
 use num_traits::identities::Zero;
+use polars::prelude::*;
 
 pub struct AnalysisMethods {}
 
@@ -66,7 +67,7 @@ impl AnalysisToolKit for AnalysisMethods {
 
         return Ok(svd_output);
     }
-    fn filter_svd_matrices<T>(&self, matrices: &Vec<DMatrix<T>>, singular_values: &DVector<T::RealField>, informationThreshold: f64) -> Option<DMatrix<T>>
+    fn filter_svd_matrices<T>(&self, matrices: &Vec<DMatrix<T>>, singular_values: &DVector<T::RealField>, information_threshold: f64) -> Option<DMatrix<T>>
         where
             T: Float + RealField + Scalar {
         let sum_squared = singular_values.map(|i| i*i).
@@ -78,7 +79,7 @@ impl AnalysisToolKit for AnalysisMethods {
         let mut information = 0.0;
         let mut index = 0;
         for matrix in matrices.iter() {
-            if information > informationThreshold {
+            if information > information_threshold {
                 break;
             }
             match index {
@@ -94,6 +95,29 @@ impl AnalysisToolKit for AnalysisMethods {
             index += 1;
         }
         return filtered_matrix;
+    }
+    fn fit_regression<T>(&self, independent_variables: &DMatrix<T>, dependent_variables: &DVector<T>, eps: T) -> DVector<f64>
+        where T: Float + RealField {
+        let A = independent_variables.clone();
+        let b = dependent_variables.clone();
+        let x = (A.transpose()*A.clone()).pseudo_inverse(eps).unwrap()*(A.transpose()*b);
+        return x.map(|i| Float::round(num_traits::ToPrimitive::to_f64(&i).unwrap()*100.0)/100.0);
+    }
+    fn create_predictions<T>(&self, coefficients: &DVector<T>, independent_variables: &DMatrix<T>) -> DVector<T> 
+        where T: Float + RealField {
+        let output = coefficients.transpose() * (independent_variables);
+        return output.transpose();
+    }
+    fn clean_data(&self, df: DataFrame, settings: DataSettings) -> DataFrame {
+        let mut return_df = df;
+        if settings.look_back != 0 {
+            return_df = return_df.tail(Some(num_traits::ToPrimitive::to_usize(&settings.look_back).unwrap()));
+        }
+
+        if settings.remove_date_col {
+            let date_col = return_df.drop_in_place("date").unwrap();
+        }
+        return return_df
     }
 }
 
@@ -129,7 +153,7 @@ mod tests {
             1., 1., 1.
         ]);
         let stddev = methods.calculate_row_std(&matrix);
-        assert_eq!(stddev, DVector::from_fn(3, |i, _| 0.0).transpose());
+        assert_eq!(stddev, DVector::from_fn(3, |_i, _| 0.0).transpose());
     }
 
     #[test]
@@ -162,7 +186,6 @@ mod tests {
             6., 6., 6.
         ]);
         let result = methods.calculate_svd(&mat);
-        println!("{:?}", result);
         match result {
             Ok(..) => assert!(true),
             Err(..) => assert!(false),
@@ -217,9 +240,26 @@ mod tests {
                 2., 2., 2.
             ]) 
         );
-
-
-
-        
+    }
+    #[test]
+    fn test_linregress() {
+        let methods = AnalysisMethods {};
+        let indep = DMatrix::from_vec(2, 3, vec![1., 2., 3., 4., 5., 6.]).transpose();
+        let dep = DVector::from_vec(vec![5., 11., 17.]);
+        let regression_out = methods.fit_regression(&indep, &dep, 0.001);
+        assert_eq!(regression_out, DVector::from_vec(vec![1., 2.]));
+    }
+    #[test]
+    fn test_clean_data() {
+        let settings = DataSettings {
+            look_back: 1,
+            remove_null_cols: true,
+            remove_date_col: true
+        };
+        let methods = AnalysisMethods {};
+        let data = df!("date" => &["12/21/2021", "12/21/2022"],
+        "price" => &["12.21", "12.22"]).unwrap();
+        let result = methods.clean_data(data, settings);
+        assert_eq!(result, df!("price" => &["12.22"]).unwrap())
     }
 }
