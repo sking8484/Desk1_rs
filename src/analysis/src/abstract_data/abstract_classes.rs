@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Debug};
 
-use nalgebra::{ComplexField, DMatrix, DVector, RealField, RowOVector, Dyn};
+use nalgebra::{ComplexField, DMatrix, DVector, Dyn, RealField, RowOVector};
 use num::Float;
 use num_traits::identities::Zero;
 use polars::prelude::*;
@@ -20,14 +20,30 @@ pub trait AnalysisToolKit {
     fn calculate_svd<T>(&self, matrix: &DMatrix<T>) -> Result<SVD<T>, Box<dyn Error>>
     where
         T: nalgebra::ComplexField<RealField = T> + Copy;
-    fn filter_svd_matrices<T>(&self, matrices: &Vec<DMatrix<T>>, values: &DVector<T::RealField>, information_threshold: f64) -> Option<DMatrix<T>>
+    fn filter_svd_matrices<T>(
+        &self,
+        matrices: &Vec<DMatrix<T>>,
+        values: &DVector<T::RealField>,
+        information_threshold: f64,
+    ) -> Option<DMatrix<T>>
     where
         T: Float + RealField;
-    fn fit_regression<T>(&self, independent_variables: &DMatrix<T>, dependent_variables: &DVector<T>, eps:T) -> DVector<f64>
-        where T: Float + RealField;
+    fn fit_regression<T>(
+        &self,
+        independent_variables: &DMatrix<T>,
+        dependent_variables: &DVector<T>,
+        eps: T,
+    ) -> DVector<f64>
+    where
+        T: Float + RealField;
     fn clean_data(&self, df: DataFrame, settings: DataSettings) -> DataFrame;
-    fn create_predictions<T>(&self, coefficients: &DVector<T>, independent_variables: &DMatrix<T>) -> DVector<T>
-        where T: Float + RealField;
+    fn create_predictions<T>(
+        &self,
+        coefficients: &DVector<T>,
+        independent_variables: &DMatrix<T>,
+    ) -> DVector<T>
+    where
+        T: Float + RealField;
 }
 
 #[derive(Debug)]
@@ -51,8 +67,11 @@ where
 pub struct DataSettings {
     pub look_back: i32,
     pub remove_null_cols: bool,
-    pub remove_date_col: bool
+    pub remove_date_col: bool,
 }
 
-
-pub trait MSSA {}
+pub trait MSSA {
+    fn create_prediction_features<T>(&self, data: &DMatrix<T>)
+    where
+        T: Float + RealField;
+}

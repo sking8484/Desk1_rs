@@ -11,3 +11,4 @@ num-traits = "0.2.15"
 simba = "0.8.0"
 num = "0.4.0"
 polars = {version = "0.28.0", features = ['pct_change']}
+smartstring = "1.0.1"
