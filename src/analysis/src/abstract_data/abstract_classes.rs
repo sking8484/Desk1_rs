@@ -55,3 +55,4 @@ pub struct DataSettings {
 }
 
 
+pub trait MSSA {}
