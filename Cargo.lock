@@ -32,6 +32,7 @@ dependencies = [
  "num-traits",
  "polars",
  "simba",
+ "smartstring",
 ]
 
 [[package]]
