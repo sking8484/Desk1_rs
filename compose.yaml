@@ -1,3 +1,0 @@
-services:
-  analysis:
-    build: src/analysis

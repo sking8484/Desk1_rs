@@ -10,6 +10,9 @@ use num::Float;
 use num_traits::identities::Zero;
 use polars::prelude::*;
 
+pub struct PortfolioPredictions{
+
+}
 pub struct AnalysisMethods {}
 
 impl AnalysisToolKit for AnalysisMethods {
