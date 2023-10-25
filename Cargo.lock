@@ -24,18 +24,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "analysis"
-version = "0.1.0"
-dependencies = [
- "nalgebra",
- "num",
- "num-traits",
- "polars",
- "simba",
- "smartstring",
-]
-
-[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1231,6 +1219,18 @@ dependencies = [
  "rayon",
  "smartstring",
  "sysinfo",
+]
+
+[[package]]
+name = "portfolio_predictions"
+version = "0.1.0"
+dependencies = [
+ "nalgebra",
+ "num",
+ "num-traits",
+ "polars",
+ "simba",
+ "smartstring",
 ]
 
 [[package]]
