@@ -1,9 +1,8 @@
-use crate::abstract_data::abstract_classes::{
+use crate::analysis::abstract_data::abstract_data::{
     AnalysisToolKit, DataSettings, DecompData, MSSA, SVD,
 };
 use smartstring::alias::String;
 use std::{error::Error, fmt::Debug};
-pub mod abstract_data;
 use nalgebra::*;
 
 use num::Float;
