@@ -1,5 +1,5 @@
 [package]
-name = "PortfolioPredictions"
+name = "portfolio_predictions"
 version = "0.1.0"
 edition = "2021"
 
