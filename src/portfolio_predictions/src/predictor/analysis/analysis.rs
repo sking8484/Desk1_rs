@@ -1,5 +1,5 @@
-use crate::analysis::api::api::{
-    AnalysisToolKit, DataSettings, DecompData, MSSA, SVD,
+use crate::predictor::analysis::api::{
+    AnalysisToolKit, DataSettings, DecompData, MSSA, SVD, Analysis
 };
 use smartstring::alias::String;
 use std::{error::Error, fmt::Debug};
@@ -10,6 +10,12 @@ use num_traits::identities::Zero;
 use polars::prelude::*;
 
 pub struct AnalysisMethods {}
+
+impl Analysis for AnalysisMethods {
+    fn test(&self) -> bool {
+        return true;
+    }
+}
 
 impl AnalysisToolKit for AnalysisMethods {
     fn calculate_num_rows<T>(&self, data: &DMatrix<T>) -> usize {
