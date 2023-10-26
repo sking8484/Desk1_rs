@@ -1,31 +1,34 @@
-pub mod analysis;
+pub mod predictor;
+use crate::predictor::api::Predictor as Predictor;
 
-struct PortfolioPredictor<T: predictor, K:datalink> {
+struct PortfolioPredictor<T: Predictor> {
     prediction_methods: T,
-    data_link: K,
 }
 
-impl<T, K> PortfolioPredictor<T, K> {
-    fn new(methods: T, link: K) -> Self {
-        return PortfolioPredictor{prediction_methods:methods, data_link:link};
+impl<T: Predictor> PortfolioPredictor<T> {
+    fn new(methods: T) -> Self {
+        return PortfolioPredictor{prediction_methods:methods};
     } 
+
+    fn update_predictions(&self) -> bool {
+        self.prediction_methods.create_predictions()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::predictor::mssa::MssaPredictor;
 
     #[test]
     fn test_instance() {
-        let portfolio_predictor = PortfolioPredictor::new(1, 0);
+        let _portfolio_predictor = PortfolioPredictor::new(MssaPredictor{num_days_per_col: 2});
         assert!(true)
-
     }
 
     #[test]
-    fn test_trait_impls() {
-        let portfolio_predictor = PortfolioPredictor::new(1, 0);
-        assert!(portfolio_predictor.prediction_methods.test())
-        assert!(portfolio_predictor.data_link.test())
+    fn test_predictor_impl() {
+        let portfolio_predictor = PortfolioPredictor::new(MssaPredictor{num_days_per_col:2});
+        assert!(portfolio_predictor.prediction_methods.test());
     }
 }
