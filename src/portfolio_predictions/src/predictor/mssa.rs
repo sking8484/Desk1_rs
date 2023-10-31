@@ -60,41 +60,51 @@ impl MssaPredictor {
     }
 
     fn build_page_matrix_data<A: std::clone::Clone>(&self, data_matrix: Array2<A>) -> Result<Array2<A>, PolarsError> {
-        let mut column_data = data_matrix.axis_iter(Axis(1));
+        let column_data = data_matrix.axis_iter(Axis(1));
         let mut return_array: Option<Array2<A>> = None;
         let mut next_col_vec: Option<Array1<A>> = None;
         for col in column_data {
             let mut j = 0;
             let inner_column_data = col.iter();
             for data_point in inner_column_data {
-                if j == 0 {
-                    next_col_vec = Some(array![data_point.to_owned()]);
-                } else {
-                    next_col_vec = Some(concatenate![Axis(0), next_col_vec.clone().expect("Next Col Vec must be instantiated").view(), array![data_point.to_owned()]]);
-                }
+                next_col_vec = self.build_column_vector(j, data_point, next_col_vec);
+                
                 j += 1;
                 if j == self.num_days_per_col {
-                    match &return_array {
-                        Some(value) => {
-                            return_array = concatenate![Axis(1), value.clone(), next_col_vec.clone().expect("Better be good").insert_axis(Axis(1))].into();
-                        },
-                        None => {
-                            return_array = Some(next_col_vec.clone().expect("Next Col Vec should be instantiated").insert_axis(Axis(1)));
-                        }
-                    }
-                    
+                    return_array = self.build_return_array(return_array, &next_col_vec);
                     j = 0;
                 }
             }
         }
-        match return_array {
-            Some(value) => return Ok(value),
-            None => return Err(PolarsError::ComputeError("Error".into())),
+        if let Some(array) = return_array {
+            return Ok(array);
+        } else {
+            return Err(PolarsError::ComputeError("Error".into()))
         }
     }
 
+    fn build_column_vector<A: std::clone::Clone>(&self, j: i64, data_point: &A, mut next_col_vec: Option<Array1<A>>) -> Option<Array1<A>> {
+        if j == 0 {
+            next_col_vec = Some(array![data_point.to_owned()]);
+        } else {
+            next_col_vec = Some(concatenate![Axis(0), next_col_vec.clone().expect("Next Col Vec must be instantiated").view(), array![data_point.to_owned()]]);
+        }
+
+        return next_col_vec
+    }
+
+    fn build_return_array<A: std::clone::Clone>(&self, mut return_array: Option<Array2<A>>, next_col_vec: &Option<Array1<A>>) -> Option<Array2<A>> {
+        if let Some(value) = return_array {
+            return_array = concatenate![Axis(1), value.clone(), next_col_vec.clone().expect("Better be good").insert_axis(Axis(1))].into();
+        } else {
+            return_array = Some(next_col_vec.clone().expect("Next Col Vec should be instantiated").insert_axis(Axis(1)));
+        }
+
+        return return_array
+    }
+
     fn convert_ndarray_to_polars(&self, array: Array2<f64>, column_names: Vec<String>) -> Result<DataFrame, PolarsError> {
-        let mut df: DataFrame = DataFrame::new(
+        let df: DataFrame = DataFrame::new(
         array.axis_iter(ndarray::Axis(1))
             .into_iter()
             .enumerate()
