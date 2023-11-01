@@ -5,9 +5,6 @@ use num::Float;
 use num_traits::identities::Zero;
 use polars::prelude::*;
 
-pub trait Analysis {
-    fn test(&self) -> bool;
-}
 
 pub trait AnalysisToolKit {
     fn calculate_num_rows<T>(&self, data: &DMatrix<T>) -> usize;

@@ -1,6 +1,5 @@
 extern crate polars;
 
-use crate::predictor::analysis::api::Analysis;
 use polars::prelude::*;
 
 

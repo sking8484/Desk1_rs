@@ -5,8 +5,8 @@ use polars::frame::*;
 
 extern crate polars;
 use crate::predictor::api::{Predictor};
-use crate::predictor::analysis::api::Analysis;
 use ndarray::*;
+use crate::predictor::analysis::analysis::NDArrayHelper;
 
 use super::analysis::analysis::AnalysisMethods;
 
@@ -41,12 +41,13 @@ impl Predictor for MssaPredictor {
 
 impl MssaPredictor {
     fn create_page_matrix(&self, cleaned_data: DataFrame) -> Result<DataFrame, PolarsError> {
+
         let array_data = cleaned_data.to_ndarray::<Float64Type>(IndexOrder::Fortran)?;
 
         let raw_column_names = cleaned_data.get_column_names();
         let formatted_col_names = self.create_column_names(raw_column_names);
         let page_matrix = self.build_page_matrix_data(array_data)?;
-        return Ok(self.convert_ndarray_to_polars(page_matrix, formatted_col_names)?);
+        return Ok(NDArrayHelper{}.convert_ndarray_to_polars(page_matrix, formatted_col_names)?);
     }
 
     fn create_column_names(&self, columns: Vec<&str>) -> Vec<String> {
@@ -63,6 +64,7 @@ impl MssaPredictor {
         let column_data = data_matrix.axis_iter(Axis(1));
         let mut return_array: Option<Array2<A>> = None;
         let mut next_col_vec: Option<Array1<A>> = None;
+
         for col in column_data {
             let mut j = 0;
             let inner_column_data = col.iter();
@@ -76,6 +78,7 @@ impl MssaPredictor {
                 }
             }
         }
+
         if let Some(array) = return_array {
             return Ok(array);
         } else {
@@ -103,21 +106,7 @@ impl MssaPredictor {
         return return_array
     }
 
-    fn convert_ndarray_to_polars(&self, array: Array2<f64>, column_names: Vec<String>) -> Result<DataFrame, PolarsError> {
-        let df: DataFrame = DataFrame::new(
-        array.axis_iter(ndarray::Axis(1))
-            .into_iter()
-            .enumerate()
-            .map(|(i, col)| {
-                Series::new(
-                    &column_names[i],
-                    col.to_vec()
-                )
-            })
-            .collect::<Vec<Series>>()
-        ).unwrap();
-        return Ok(df)
-    }
+    
 }
 
 #[cfg(test)]
