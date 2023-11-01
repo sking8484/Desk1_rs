@@ -1,20 +1,35 @@
 use crate::predictor::analysis::api::{
-    AnalysisToolKit, DataSettings, DecompData, MSSA, SVD, Analysis
+    AnalysisToolKit, DataSettings, DecompData, MSSA, SVD
 };
-use smartstring::alias::String;
 use std::{error::Error, fmt::Debug};
 use nalgebra::*;
+use ndarray::*;
 
 use num::Float;
 use num_traits::identities::Zero;
 use polars::prelude::*;
 
-pub struct AnalysisMethods {}
+pub struct AnalysisMethods{}
+pub struct NDArrayHelper {}
 
-impl Analysis for AnalysisMethods {
-    fn test(&self) -> bool {
-        return true;
+impl NDArrayHelper {
+
+    pub fn convert_ndarray_to_polars(&self, array: Array2<f64>, column_names: Vec<String>) -> Result<DataFrame, PolarsError> {
+        let df: DataFrame = DataFrame::new(
+        array.axis_iter(ndarray::Axis(1))
+            .into_iter()
+            .enumerate()
+            .map(|(i, col)| {
+                Series::new(
+                    &column_names[i],
+                    col.to_vec()
+                )
+            })
+            .collect::<Vec<Series>>()
+        ).unwrap();
+        return Ok(df)
     }
+
 }
 
 impl AnalysisToolKit for AnalysisMethods {
@@ -167,11 +182,16 @@ impl SpectrumAnalysis {
         if look_back % l != 0 {
             panic!("Lookback and l are not comapitable")
         }
+
+        let mut names_vec : Vec<String> = Vec::new();
+        for elem in data.get_column_names().iter() {
+            names_vec.push(format!("{}", elem))
+        }
         Self {
             l,
             look_back,
             information_threshold,
-            columns: DVector::from_vec(data.get_column_names_owned()),
+            columns: DVector::from_vec(names_vec),
             data,
         }
     }
@@ -326,5 +346,24 @@ mod test_spectrum {
         println!("{}", data_mat);
         let spectrum = SpectrumAnalysis::new(data.clone(), 2, 0, 0.95);
         spectrum.create_prediction_features(&data_mat)
+    }
+
+    #[test]
+    fn test_polars_from_ndarray() {
+        let array_helpers = NDArrayHelper{};
+        let column_names: Vec<String> = vec!["One".to_string(), "Two".to_string()];
+        let array = array![[1.0, 2.0,], [3.0, 4.0]];
+        let df = array_helpers.convert_ndarray_to_polars(array, column_names);
+        let expected = DataFrame::new(vec![
+            Series::new("One", &[1.0, 3.0]),
+            Series::new("Two", &[2.0, 4.0])
+        ]).expect("DF Just created should not be empty");
+        if let Ok(val) = df {
+            assert_eq!(val, expected)
+        } else {
+            assert!(false);
+        }
+        
+        
     }
 }
