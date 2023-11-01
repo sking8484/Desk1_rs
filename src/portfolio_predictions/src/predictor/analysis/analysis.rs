@@ -9,7 +9,47 @@ use num::Float;
 use num_traits::identities::Zero;
 use polars::prelude::*;
 
+pub enum AnalysisError {
+    SVDError,
+    ConversionError,
+    ShapeError
+}
+
 pub struct AnalysisMethods{}
+
+pub struct NDArrayMath{}
+pub struct SvdResponse{
+    pub u: Array2<f64>,
+    pub sigma: Array2<f64>,
+    pub vt: Array2<f64>
+}
+
+impl NDArrayMath {
+    pub fn svd(&self, array: Array2<f64>) -> Result<SvdResponse, AnalysisError> {
+        let (nrows, ncols) = array.dim();
+        let nalgebra_matrix = DMatrix::from_iterator(nrows, ncols, array.into_iter());
+        let svd = nalgebra_matrix.svd(true, true);
+        let svd_output = self.build_svd_return_object(svd);
+
+        if let Ok(response) = svd_output {
+            return Ok(response)
+        }
+        return Err(AnalysisError::SVDError)
+    }
+    pub fn build_svd_return_object(&self, svd_response: nalgebra::SVD<f64, nalgebra::Dyn, nalgebra::Dyn>) -> Result<SvdResponse, ShapeError>{
+        let u: Array2<f64> = NDArrayHelper{}.convert_nalgebra_to_ndarray(svd_response.v_t.expect("U Matrix should not be empty"))?.t().to_owned();
+        let sigma: Array2<f64> = Array2::from_diag(&NDArrayHelper{}.convert_nalgebra_vec_to_ndarray(svd_response.singular_values)?);
+        let vt: Array2<f64> = NDArrayHelper{}.convert_nalgebra_to_ndarray(svd_response.u.expect("V_T matrix should not be empty"))?;
+
+
+        return Ok(SvdResponse{
+            u,
+            sigma,
+            vt
+        })
+    }
+}
+
 pub struct NDArrayHelper {}
 
 impl NDArrayHelper {
@@ -28,6 +68,22 @@ impl NDArrayHelper {
             .collect::<Vec<Series>>()
         ).unwrap();
         return Ok(df)
+    }
+     pub fn convert_nalgebra_to_ndarray(&self, matrix: nalgebra::DMatrix<f64>) -> Result<Array2<f64>, ShapeError> {
+        let (nrows, ncols) = matrix.shape();
+        let ndarray = Array2::from_shape_vec((nrows, ncols), matrix.data.as_vec().clone())?;
+        return Ok(ndarray)
+    }
+    
+    pub fn convert_nalgebra_vec_to_ndarray(&self, vector: nalgebra::DVector<f64>) -> Result<Array1<f64>, ShapeError> {
+        let ndarray_array = Array1::from(
+            vector
+                .as_slice()
+                .iter()
+                .map(|&x| x)
+                .collect::<Vec<f64>>(),
+        );
+        return Ok(ndarray_array)
     }
 
 }
@@ -348,6 +404,13 @@ mod test_spectrum {
         spectrum.create_prediction_features(&data_mat)
     }
 
+    
+}
+
+#[cfg(test)]
+mod test_ndrray_helper {
+    use super::*;
+
     #[test]
     fn test_polars_from_ndarray() {
         let array_helpers = NDArrayHelper{};
@@ -363,7 +426,57 @@ mod test_spectrum {
         } else {
             assert!(false);
         }
+    }
+}
+
+#[cfg(test)]
+mod test_ndarray_math {
+    use super::*;
+
+    #[test]
+    fn test_individual_svd_elements() {
+        let array = array![[4.0, 0.0], [3.0, -5.0]];
+        let svd_output = NDArrayMath{}.svd(array);
+        let U = array![
+            [-1.0/5.0_f64.powf(0.5), 2.0/5.0_f64.powf(0.5)],
+            [-2.0/5.0_f64.powf(0.5), -1.0/5.0_f64.powf(0.5)]
+        ];
+        let sigma = array![
+            [40.0_f64.powf(0.5), 0.0],
+            [0.0, 10.0_f64.powf(0.5)]
+        ];
         
+        let vt = array![
+            [-1.0/2.0_f64.powf(0.5), 1.0/2.0_f64.powf(0.5)],
+            [1.0/2.0_f64.powf(0.5), 1.0/2.0_f64.powf(0.5)]
+        ];
+        if let Ok(val) = svd_output {
+            assert_eq!(val.u.map(|&x| x.round().abs()), U.map(|&x| x.round().abs()));
+            assert_eq!(val.sigma.map(|&x| x.round().abs()), sigma.map(|&x| x.round().abs()));
+            assert_eq!(val.vt.map(|&x| x.round().abs()), vt.map(|&x| x.round().abs()));
+        }
+    }
+
+    #[test]
+    fn test_svd_combines_to_original() {
+        let array = array![[4.0, 0.0], [3.0, -5.0]];
+        let svd_output = NDArrayMath{}.svd(array.clone());
+        let U = array![
+            [-1.0/5.0_f64.powf(0.5), 2.0/5.0_f64.powf(0.5)],
+            [-2.0/5.0_f64.powf(0.5), -1.0/5.0_f64.powf(0.5)]
+        ];
+        let sigma = array![40.0_f64.powf(0.5), 10.0_f64.powf(0.5)];
         
+        let vt = array![
+            [-1.0/2.0_f64.powf(0.5), 1.0/2.0_f64.powf(0.5)],
+            [1.0/2.0_f64.powf(0.5), 1.0/2.0_f64.powf(0.5)]
+        ];
+        if let Ok(val) = svd_output {
+            let us = val.u.dot(&val.sigma);
+            let usv = us.dot(&val.vt);
+
+            assert_eq!(usv.map(|&x| {(x*1000.0).round()/1000.0}), array);
+        }
+
     }
 }
