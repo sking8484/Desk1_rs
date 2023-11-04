@@ -13,7 +13,8 @@ use polars::prelude::*;
 pub enum AnalysisError {
     SVDError,
     ConversionError,
-    ShapeError
+    ShapeError,
+    ModelError
 }
 
 pub struct AnalysisMethods{}
@@ -24,11 +25,10 @@ pub struct SvdResponse{
     pub sigma: Array2<f64>,
     pub vt: Array2<f64>
 }
-
 impl NDArrayMath {
     pub fn svd(&self, array: Array2<f64>) -> Result<SvdResponse, AnalysisError> {
-        let (nrows, ncols) = array.dim();
-        let nalgebra_matrix = DMatrix::from_iterator(nrows, ncols, array.into_iter());
+        
+        let nalgebra_matrix = NDArrayHelper{}.convert_ndarray_matrix_to_nalgebra(array);
         let svd = nalgebra_matrix.svd(true, true);
         let svd_output = NDArrayHelper{}.build_svd_return_object(svd);
 
@@ -56,7 +56,33 @@ impl NDArrayMath {
         let u_sigma_vt = u_sigma.dot(&svd_response.vt);
         return u_sigma_vt
     }
-    
+
+    pub fn build_linear_model(&self, A: Array2<f64>, b: Array1<f64>) -> Result<Array1<f64>, AnalysisError> {
+
+        let na_design_matrix = NDArrayHelper{}.convert_ndarray_matrix_to_nalgebra(A);
+        let na_observations = NDArrayHelper{}.convert_ndarray_vector_to_nalgebra(b);
+
+        let a_transpose_a = na_design_matrix.clone().transpose() * na_design_matrix.clone();
+        let a_transpose_b = na_design_matrix.clone().transpose() * na_observations;
+
+        let a_transpose_a_inv = a_transpose_a.try_inverse();
+        if let Some(inv) = a_transpose_a_inv {
+            let model =  inv*a_transpose_b;
+            let ndarray_model = NDArrayHelper{}.convert_nalgebra_to_ndarray(model);
+            if let Ok(nd_model) = ndarray_model.clone() {
+                let vec = nd_model.clone().into_shape(nd_model.nrows());
+                if let Ok(v) = vec {
+                    return Ok(v);
+                } else {
+                    return Err(AnalysisError::ModelError)
+                }
+            } else {
+                return Err(AnalysisError::ModelError)
+            }
+        } else {
+            return Err(AnalysisError::ModelError)
+        }
+    }
 }
 
 pub struct NDArrayHelper {}
@@ -64,9 +90,9 @@ pub struct NDArrayHelper {}
 impl NDArrayHelper {
 
     pub fn build_svd_return_object(&self, svd_response: nalgebra::SVD<f64, nalgebra::Dyn, nalgebra::Dyn>) -> Result<SvdResponse, ShapeError>{
-        let u: Array2<f64> = self.convert_nalgebra_to_ndarray(svd_response.v_t.expect("U Matrix should not be empty"))?.t().to_owned();
+        let u: Array2<f64> = self.convert_nalgebra_to_ndarray(svd_response.u.expect("U Matrix should not be empty"))?.to_owned();
         let sigma: Array2<f64> = Array2::from_diag(&self.convert_nalgebra_vec_to_ndarray(svd_response.singular_values)?);
-        let vt: Array2<f64> = self.convert_nalgebra_to_ndarray(svd_response.u.expect("V_T matrix should not be empty"))?;
+        let vt: Array2<f64> = self.convert_nalgebra_to_ndarray(svd_response.v_t.expect("V_T matrix should not be empty"))?.t().to_owned();
 
 
         return Ok(SvdResponse{
@@ -75,6 +101,20 @@ impl NDArrayHelper {
             vt
         })
     }
+
+    pub fn convert_ndarray_matrix_to_nalgebra(&self, array: Array2<f64>) -> DMatrix<f64> {
+        let (nrows, ncols) = array.dim();
+        let nalgebra_matrix = DMatrix::from_row_iterator(nrows, ncols, array.into_iter());
+        return nalgebra_matrix;
+    }
+
+    pub fn convert_ndarray_vector_to_nalgebra(&self, array: Array1<f64>) -> DMatrix<f64> {
+        let nrows = array.dim();
+        let nalgebra_matrix = DMatrix::from_row_iterator(nrows, 1, array.into_iter());
+        return nalgebra_matrix;
+        
+    }
+
     pub fn convert_ndarray_to_polars(&self, array: Array2<f64>, column_names: Vec<String>) -> Result<DataFrame, PolarsError> {
         let df: DataFrame = DataFrame::new(
         array.axis_iter(ndarray::Axis(1))
@@ -472,9 +512,9 @@ mod test_ndarray_math {
             [1.0/2.0_f64.powf(0.5), 1.0/2.0_f64.powf(0.5)]
         ];
         if let Ok(val) = svd_output {
-            assert_eq!(val.u.map(|&x| x.round().abs()), U.map(|&x| x.round().abs()));
-            assert_eq!(val.sigma.map(|&x| x.round().abs()), sigma.map(|&x| x.round().abs()));
-            assert_eq!(val.vt.map(|&x| x.round().abs()), vt.map(|&x| x.round().abs()));
+            assert_eq!(val.u.map(|&x| ((x*1000.0).round()/1000.0).abs()), U.map(|&x| ((x*1000.0).round()/1000.0).abs()));
+            assert_eq!(val.sigma.map(|&x| (x*1000.0).round()/1000.0), sigma.map(|&x| (x*1000.0).round()/1000.0));
+            assert_eq!(val.vt.map(|&x| ((x*1000.0).round()/1000.0).abs()), vt.map(|&x| ((x*1000.0).round()/1000.0).abs()));
         }
     }
 
@@ -554,5 +594,24 @@ mod test_ndarray_math {
         let filtered_output = NDArrayMath{}.filter_svd_matrices(svd_output.expect("SVD Output should be ok"), 0.5);
         let recombined_maxtrix = NDArrayMath{}.rebuild_matrix_from_svd(filtered_output);
         assert_eq!(recombined_maxtrix.map(|&a| (a*1000.0).round()/1000.0), expected_matrix.map(|&a| (a*1000.0).round()/1000.0));
+    }
+
+    #[test]
+    fn test_build_linear_model() {
+        let input_a = array![
+            [1.0, 2.0],
+            [1.0, 5.0],
+            [1.0, 7.0],
+            [1.0, 8.0]
+
+        ];
+
+        let input_b  = array![1.0, 2.0, 3.0, 3.0];
+        let expected = array![2.0/7.0, 5.0/14.0];
+
+        let model = NDArrayMath{}.build_linear_model(input_a, input_b);
+
+        assert_eq!(model.expect("Should build model").map(|&a| (a*1000.0).round()/1000.0), expected.map(|&a| num_traits::Float::round(a*1000.0)/1000.0))
+
     }
 }
