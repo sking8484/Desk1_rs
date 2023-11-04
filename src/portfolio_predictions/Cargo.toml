@@ -13,3 +13,4 @@ num = "0.4.0"
 polars = {version = "0.34.2", features = ['pct_change', 'ndarray']}
 smartstring = "1.0.1"
 ndarray = "0.15.6"
+
