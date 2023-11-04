@@ -9,6 +9,7 @@ use num::Float;
 use num_traits::identities::Zero;
 use polars::prelude::*;
 
+#[derive(Debug)]
 pub enum AnalysisError {
     SVDError,
     ConversionError,
@@ -29,17 +30,43 @@ impl NDArrayMath {
         let (nrows, ncols) = array.dim();
         let nalgebra_matrix = DMatrix::from_iterator(nrows, ncols, array.into_iter());
         let svd = nalgebra_matrix.svd(true, true);
-        let svd_output = self.build_svd_return_object(svd);
+        let svd_output = NDArrayHelper{}.build_svd_return_object(svd);
 
         if let Ok(response) = svd_output {
             return Ok(response)
         }
         return Err(AnalysisError::SVDError)
     }
+
+    pub fn filter_svd_matrices(&self, svd_response: SvdResponse, min_significant_val: f64) -> SvdResponse {
+        let sigma_sum = svd_response.sigma.sum();
+        let new_sigmas = svd_response.sigma.map(|&a| {
+            if a/sigma_sum > min_significant_val {
+                return a;
+            } else {
+                return 0.0;
+            }
+        });
+
+        return SvdResponse { u: svd_response.u.clone(), sigma: new_sigmas, vt: svd_response.vt.clone() }
+    }
+
+    pub fn rebuild_matrix_from_svd(&self, svd_response: SvdResponse) -> Array2<f64> {
+        let u_sigma = svd_response.u.dot(&svd_response.sigma);
+        let u_sigma_vt = u_sigma.dot(&svd_response.vt);
+        return u_sigma_vt
+    }
+    
+}
+
+pub struct NDArrayHelper {}
+
+impl NDArrayHelper {
+
     pub fn build_svd_return_object(&self, svd_response: nalgebra::SVD<f64, nalgebra::Dyn, nalgebra::Dyn>) -> Result<SvdResponse, ShapeError>{
-        let u: Array2<f64> = NDArrayHelper{}.convert_nalgebra_to_ndarray(svd_response.v_t.expect("U Matrix should not be empty"))?.t().to_owned();
-        let sigma: Array2<f64> = Array2::from_diag(&NDArrayHelper{}.convert_nalgebra_vec_to_ndarray(svd_response.singular_values)?);
-        let vt: Array2<f64> = NDArrayHelper{}.convert_nalgebra_to_ndarray(svd_response.u.expect("V_T matrix should not be empty"))?;
+        let u: Array2<f64> = self.convert_nalgebra_to_ndarray(svd_response.v_t.expect("U Matrix should not be empty"))?.t().to_owned();
+        let sigma: Array2<f64> = Array2::from_diag(&self.convert_nalgebra_vec_to_ndarray(svd_response.singular_values)?);
+        let vt: Array2<f64> = self.convert_nalgebra_to_ndarray(svd_response.u.expect("V_T matrix should not be empty"))?;
 
 
         return Ok(SvdResponse{
@@ -48,12 +75,6 @@ impl NDArrayMath {
             vt
         })
     }
-}
-
-pub struct NDArrayHelper {}
-
-impl NDArrayHelper {
-
     pub fn convert_ndarray_to_polars(&self, array: Array2<f64>, column_names: Vec<String>) -> Result<DataFrame, PolarsError> {
         let df: DataFrame = DataFrame::new(
         array.axis_iter(ndarray::Axis(1))
@@ -461,22 +482,77 @@ mod test_ndarray_math {
     fn test_svd_combines_to_original() {
         let array = array![[4.0, 0.0], [3.0, -5.0]];
         let svd_output = NDArrayMath{}.svd(array.clone());
+        if let Ok(val) = svd_output {
+            let recombined_matrix = NDArrayMath{}.rebuild_matrix_from_svd(val);
+
+            assert_eq!(recombined_matrix.map(|&x| {(x*1000.0).round()/1000.0}), array);
+        }
+
+    }
+
+    #[test]
+    fn test_filter_all_svd() {
+        let array = array![[4.0, 0.0], [3.0, -5.0]];
+        let svd_output = NDArrayMath{}.svd(array.clone());
+        let expected_sigma = array![
+            [0.0, 0.0],
+            [0.0, 0.0]
+        ];
+        let filtered_output = NDArrayMath{}.filter_svd_matrices(svd_output.expect("SVD Output should be ok"), 1.0);
+        assert_eq!(filtered_output.sigma, expected_sigma);
+    }
+
+    #[test]
+    fn test_filter_none_svd() {
+        let array = array![[4.0, 0.0], [3.0, -5.0]];
+        let svd_output = NDArrayMath{}.svd(array.clone());
+
+        let sigma = array![
+            [40.0_f64.powf(0.5), 0.0],
+            [0.0, 10.0_f64.powf(0.5)]
+        ];
+        
+        let filtered_output = NDArrayMath{}.filter_svd_matrices(svd_output.expect("SVD Output should be ok"), 0.0);
+        assert_eq!(filtered_output.sigma.map(|&a| (a*1000.0).round()/1000.0), sigma.map(|&a| (a*1000.0).round()/1000.0));
+    }
+
+    #[test]
+    fn test_filter_some_svd() {
+        let array = array![[4.0, 0.0], [3.0, -5.0]];
+        let svd_output = NDArrayMath{}.svd(array.clone());
+
+        let sigma = array![
+            [40.0_f64.powf(0.5), 0.0],
+            [0.0, 0.0]
+        ];
+        
+        let filtered_output = NDArrayMath{}.filter_svd_matrices(svd_output.expect("SVD Output should be ok"), 0.5);
+        assert_eq!(filtered_output.sigma.map(|&a| (a*1000.0).round()/1000.0), sigma.map(|&a| (a*1000.0).round()/1000.0));
+    }
+    
+    #[test]
+    fn test_recombinded_svd() {
+        let array = array![[4.0, 0.0], [3.0, -5.0]];
+        let svd_output = NDArrayMath{}.svd(array.clone());
+
         let U = array![
             [-1.0/5.0_f64.powf(0.5), 2.0/5.0_f64.powf(0.5)],
             [-2.0/5.0_f64.powf(0.5), -1.0/5.0_f64.powf(0.5)]
         ];
-        let sigma = array![40.0_f64.powf(0.5), 10.0_f64.powf(0.5)];
+        let sigma = array![
+            [40.0_f64.powf(0.5), 0.0],
+            [0.0, 0.0]
+        ];
         
         let vt = array![
             [-1.0/2.0_f64.powf(0.5), 1.0/2.0_f64.powf(0.5)],
             [1.0/2.0_f64.powf(0.5), 1.0/2.0_f64.powf(0.5)]
         ];
-        if let Ok(val) = svd_output {
-            let us = val.u.dot(&val.sigma);
-            let usv = us.dot(&val.vt);
 
-            assert_eq!(usv.map(|&x| {(x*1000.0).round()/1000.0}), array);
-        }
-
+        let expected_matrix = U.dot(&sigma).dot(&vt);
+        
+        let filtered_output = NDArrayMath{}.filter_svd_matrices(svd_output.expect("SVD Output should be ok"), 0.5);
+        let recombined_maxtrix = NDArrayMath{}.rebuild_matrix_from_svd(filtered_output);
+        assert_eq!(recombined_maxtrix.map(|&a| (a*1000.0).round()/1000.0), expected_matrix.map(|&a| (a*1000.0).round()/1000.0));
     }
 }
