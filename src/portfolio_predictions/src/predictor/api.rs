@@ -2,6 +2,12 @@ extern crate polars;
 
 use polars::prelude::*;
 
+#[derive(Debug)]
+pub enum PredictionError {
+    TrainModelError,
+    BuildDataError
+
+}
 
 pub trait Predictor {
     fn test(&self) -> bool; 

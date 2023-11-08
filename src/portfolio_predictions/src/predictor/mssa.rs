@@ -4,15 +4,20 @@ use polars::frame::*;
 
 
 extern crate polars;
-use crate::predictor::api::{Predictor};
+use crate::predictor::api::{Predictor, PredictionError};
 use ndarray::*;
-use crate::predictor::analysis::analysis::NDArrayHelper;
+use crate::predictor::analysis::analysis::{NDArrayHelper, NDArrayMath};
 
 use super::analysis::analysis::AnalysisMethods;
 
 pub struct MssaPredictor{
     pub num_days_per_col: i64,
     pub total_trailing_days: i64
+}
+
+pub struct SeperatedTrainingData {
+    pub design_matrix: Array2<f64>,
+    pub observation_array: Array1<f64>
 }
 
 
@@ -30,7 +35,7 @@ impl Predictor for MssaPredictor {
         return Ok(df)
     }
     fn create_predictions(&self) -> bool {
-        todo!()
+        return true
     }
     fn build_prediction_data(&self) -> Result<DataFrame, PolarsError> {
         let cleaned_data = self.retrieve_formatted_data()?;
@@ -40,6 +45,40 @@ impl Predictor for MssaPredictor {
 }
 
 impl MssaPredictor {
+    fn train_data(&self, prediction_data: DataFrame) -> Result<Array1<f64>, PredictionError> {
+        let training_data = self.build_training_data(prediction_data);
+        if let Ok(sep_train_data) = training_data {
+            print!("des_mat: {}", sep_train_data.design_matrix.clone());
+            print!("obs_mat: {}", sep_train_data.observation_array.clone());
+            let model = NDArrayMath{}.build_linear_model(sep_train_data.design_matrix.t().to_owned(), sep_train_data.observation_array);
+            if let Ok(trained_model) = model {
+                return Ok(trained_model)
+            } else{
+                return Err(PredictionError::TrainModelError)
+            }
+        } else {
+            return Err(PredictionError::BuildDataError)
+        }
+    }
+
+    fn build_training_data(&self, prediction_data: DataFrame) -> Result<SeperatedTrainingData, PolarsError> {
+        let (nrows, ncols) = prediction_data.shape();
+        let design_df = prediction_data.head(Some(nrows - 1));
+        let observations_df = prediction_data.tail(Some(1));
+
+        let design_array = design_df.to_ndarray::<Float64Type>(IndexOrder::Fortran)?;
+        let obs_array = observations_df.to_ndarray::<Float64Type>(IndexOrder::Fortran)?.into_shape(ncols);
+        if let Ok(vec) = obs_array {
+            return Ok(SeperatedTrainingData{
+            design_matrix: design_array,
+            observation_array: vec
+            });
+        } else {
+            return Err(PolarsError::ShapeMismatch("Bum".into()))
+        }
+
+        
+    }
     fn create_page_matrix(&self, cleaned_data: DataFrame) -> Result<DataFrame, PolarsError> {
 
         let array_data = cleaned_data.to_ndarray::<Float64Type>(IndexOrder::Fortran)?;
@@ -147,5 +186,22 @@ mod tests {
                 assert!(false)
             }
         }
+    }
+
+    #[test]
+    fn test_build_model() {
+        let input_a = DataFrame::new(vec![
+            Series::new("Constant", &[1.0, 1.0, 1.0, 1.0]),
+            Series::new("X_Val", &[2.0, 5.0, 7.0, 8.0]),
+            Series::new("Y_Val", &[1.0, 2.0, 3.0, 3.0]),
+        ]).expect("Dataframe shouldn't be null");
+        
+        let expected = array![2.0/7.0, 5.0/14.0];
+
+        let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4};
+        let predictions = predictor.train_data(input_a.transpose(None, None).expect("Good!"));
+
+        assert_eq!(predictions.expect("Should build model").map(|&a| (a*1000.0).round()/1000.0), expected.map(|&a| num_traits::Float::round(a*1000.0)/1000.0))
+
     }
 }
