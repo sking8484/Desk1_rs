@@ -11,7 +11,7 @@ impl<T: Predictor> PortfolioPredictor<T> {
     } 
 
     fn update_predictions(&self) -> bool {
-        self.prediction_methods.create_predictions()
+        return true
     }
 }
 
@@ -22,13 +22,13 @@ mod tests {
 
     #[test]
     fn test_instance() {
-        let _portfolio_predictor = PortfolioPredictor::new(MssaPredictor{num_days_per_col: 2, total_trailing_days: 2});
+        let _portfolio_predictor = PortfolioPredictor::new(MssaPredictor{num_days_per_col: 2, total_trailing_days: 2, num_assets: 10, hsvt_threshold: 0.0});
         assert!(true)
     }
 
     #[test]
     fn test_predictor_impl() {
-        let portfolio_predictor = PortfolioPredictor::new(MssaPredictor{num_days_per_col:2, total_trailing_days: 2});
+        let portfolio_predictor = PortfolioPredictor::new(MssaPredictor{num_days_per_col:2, total_trailing_days: 2, num_assets:10, hsvt_threshold: 0.0});
         assert!(portfolio_predictor.prediction_methods.test());
     }
 }

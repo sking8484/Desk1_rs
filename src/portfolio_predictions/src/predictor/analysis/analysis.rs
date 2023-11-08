@@ -62,6 +62,7 @@ impl NDArrayMath {
         let a_transpose_a = na_design_matrix.clone().transpose() * na_design_matrix.clone();
         let a_transpose_b = na_design_matrix.clone().transpose() * na_observations;
 
+        print!("{}", a_transpose_a);
         let a_transpose_a_inv = a_transpose_a.try_inverse();
         if let Some(inv) = a_transpose_a_inv {
             let model =  inv*a_transpose_b;
