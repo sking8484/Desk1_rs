@@ -1,4 +1,5 @@
 
+use num::ToPrimitive;
 use polars::prelude::*;
 use polars::frame::*;
 
@@ -8,11 +9,13 @@ use crate::predictor::api::{Predictor, PredictionError};
 use ndarray::*;
 use crate::predictor::analysis::analysis::{NDArrayHelper, NDArrayMath};
 
+use super::analysis::analysis::AnalysisError;
 use super::analysis::analysis::AnalysisMethods;
 
 pub struct MssaPredictor{
     pub num_days_per_col: i64,
-    pub total_trailing_days: i64
+    pub total_trailing_days: i64,
+    pub num_assets: i64
 }
 
 pub struct SeperatedTrainingData {
@@ -27,9 +30,7 @@ impl Predictor for MssaPredictor {
     }
     fn retrieve_formatted_data(&self) -> Result<DataFrame, PolarsError> {
         let df = DataFrame::new(vec![
-            Series::new("col1", &[1.0, 2.0, 3.0, 4.0]),
-            Series::new("col2", &[5.0, 6.0, 7.0, 8.0]),
-            Series::new("col3", &[9.0, 10.0, 11.0, 12.0]),
+            Series::new("col1", &[4.0, 3.0, 0.0, -5.0]),
             ]
         )?;
         return Ok(df)
@@ -40,16 +41,16 @@ impl Predictor for MssaPredictor {
     fn build_prediction_data(&self) -> Result<DataFrame, PolarsError> {
         let cleaned_data = self.retrieve_formatted_data()?;
         let page_matrix = self.create_page_matrix(cleaned_data)?;
-        return Ok(page_matrix);
+        let hsvt_matrix = self.create_hsvt_matrix(page_matrix)?;
+        return Ok(hsvt_matrix);
     }
 }
 
 impl MssaPredictor {
+    
     fn train_data(&self, prediction_data: DataFrame) -> Result<Array1<f64>, PredictionError> {
         let training_data = self.build_training_data(prediction_data);
         if let Ok(sep_train_data) = training_data {
-            print!("des_mat: {}", sep_train_data.design_matrix.clone());
-            print!("obs_mat: {}", sep_train_data.observation_array.clone());
             let model = NDArrayMath{}.build_linear_model(sep_train_data.design_matrix.t().to_owned(), sep_train_data.observation_array);
             if let Ok(trained_model) = model {
                 return Ok(trained_model)
@@ -78,6 +79,22 @@ impl MssaPredictor {
         }
 
         
+    }
+    fn create_hsvt_matrix(&self, page_matrix: DataFrame) -> Result<DataFrame, PolarsError>{
+        let num_cols_per_block = self.total_trailing_days/self.num_days_per_col;
+        let raw_column_names = page_matrix.get_column_names();
+        let return_df = DataFrame::empty();
+
+        for x in (0..(num_cols_per_block)*(self.num_assets) - 1).step_by(num_cols_per_block.to_usize().expect("")) {
+            let current_asset_page_matrix = page_matrix.select_by_range(x.to_usize().expect("")..(x+num_cols_per_block).to_usize().expect(""))?;
+            print!("{}", current_asset_page_matrix);
+            let col_names = current_asset_page_matrix.get_column_names();
+
+            let array_data = current_asset_page_matrix.to_ndarray::<Float64Type>(IndexOrder::Fortran)?;
+
+        }
+
+        return Ok(return_df)
     }
     fn create_page_matrix(&self, cleaned_data: DataFrame) -> Result<DataFrame, PolarsError> {
 
@@ -171,12 +188,8 @@ mod tests {
         let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4};
         let results = predictor.build_prediction_data();
         let expected_df = DataFrame::new(vec![
-            Series::new("col1_1", &[1.0, 2.0]),
-            Series::new("col1_2", &[3.0, 4.0]),
-            Series::new("col2_1", &[5.0, 6.0]),
-            Series::new("col2_2", &[7.0, 8.0]),
-            Series::new("col3_1", &[9.0, 10.0]),
-            Series::new("col3_2", &[11.0, 12.0]),
+            Series::new("col1_1", &[4.0, 3.0]),
+            Series::new("col1_2", &[0.0, -5.0]),
         ]).expect("Why didn't this work");
         match results {
            Ok(A) => {
@@ -205,3 +218,4 @@ mod tests {
 
     }
 }
+
