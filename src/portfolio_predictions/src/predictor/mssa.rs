@@ -83,14 +83,23 @@ impl MssaPredictor {
     fn create_hsvt_matrix(&self, page_matrix: DataFrame) -> Result<DataFrame, PolarsError>{
         let num_cols_per_block = self.total_trailing_days/self.num_days_per_col;
         let raw_column_names = page_matrix.get_column_names();
-        let return_df = DataFrame::empty();
+        let mut return_df = DataFrame::empty();
 
         for x in (0..(num_cols_per_block)*(self.num_assets) - 1).step_by(num_cols_per_block.to_usize().expect("")) {
             let current_asset_page_matrix = page_matrix.select_by_range(x.to_usize().expect("")..(x+num_cols_per_block).to_usize().expect(""))?;
-            print!("{}", current_asset_page_matrix);
+            print!("Current Page Matrix: {}", current_asset_page_matrix);
             let col_names = current_asset_page_matrix.get_column_names();
-
             let array_data = current_asset_page_matrix.to_ndarray::<Float64Type>(IndexOrder::Fortran)?;
+
+            let svd_data = NDArrayMath{}.svd(array_data);
+            if let Ok(data) = svd_data {
+                let filtered_svd = NDArrayMath{}.filter_svd_matrices(data, 0.0);
+                let rebuilt_matrix = NDArrayMath{}.rebuild_matrix_from_svd(filtered_svd).map(|&a| ((a*1000.0).round()/1000.0));
+                let df = NDArrayHelper{}.convert_ndarray_to_polars(rebuilt_matrix, self.convert_col_names_to_string(col_names))?;
+                for col in df.iter() {
+                    return_df = return_df.hstack(&[col.clone()])?;
+                }
+            }
 
         }
 
@@ -104,6 +113,14 @@ impl MssaPredictor {
         let formatted_col_names = self.create_column_names(raw_column_names);
         let page_matrix = self.build_page_matrix_data(array_data)?;
         return Ok(NDArrayHelper{}.convert_ndarray_to_polars(page_matrix, formatted_col_names)?);
+    }
+
+    fn convert_col_names_to_string(&self, columns: Vec<&str>) -> Vec<String> {
+        let mut names_vec: Vec<String> = Vec::new();
+        for elem in columns.iter() {
+            names_vec.push(format!("{}", elem))
+        }
+        return names_vec
     }
 
     fn create_column_names(&self, columns: Vec<&str>) -> Vec<String> {
@@ -171,21 +188,21 @@ mod tests {
     
     #[test]
     fn test_invoke_retrieve_data() {
-        let predictor = MssaPredictor{num_days_per_col:10, total_trailing_days: 10};
+        let predictor = MssaPredictor{num_days_per_col:10, total_trailing_days: 10, num_assets: 10};
         predictor.retrieve_formatted_data();
         assert!(true)
     }
 
     #[test]
     fn test_invoke_build_prediction_data(){
-        let predictor = MssaPredictor{num_days_per_col:10, total_trailing_days: 10};
+        let predictor = MssaPredictor{num_days_per_col:10, total_trailing_days: 10, num_assets: 10};
         predictor.build_prediction_data();
         assert!(true)
     }
 
     #[test]
     fn test_assert_build_prediction_data_correct() {
-        let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4};
+        let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4, num_assets: 1};
         let results = predictor.build_prediction_data();
         let expected_df = DataFrame::new(vec![
             Series::new("col1_1", &[4.0, 3.0]),
@@ -211,7 +228,7 @@ mod tests {
         
         let expected = array![2.0/7.0, 5.0/14.0];
 
-        let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4};
+        let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4, num_assets: 1};
         let predictions = predictor.train_data(input_a.transpose(None, None).expect("Good!"));
 
         assert_eq!(predictions.expect("Should build model").map(|&a| (a*1000.0).round()/1000.0), expected.map(|&a| num_traits::Float::round(a*1000.0)/1000.0))
