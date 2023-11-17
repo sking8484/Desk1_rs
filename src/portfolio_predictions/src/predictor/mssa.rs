@@ -15,7 +15,8 @@ use super::analysis::analysis::AnalysisMethods;
 pub struct MssaPredictor{
     pub num_days_per_col: i64,
     pub total_trailing_days: i64,
-    pub num_assets: i64
+    pub num_assets: i64,
+    pub hsvt_threshold: f64
 }
 
 pub struct SeperatedTrainingData {
@@ -77,33 +78,52 @@ impl MssaPredictor {
         } else {
             return Err(PolarsError::ShapeMismatch("Bum".into()))
         }
-
-        
     }
+
     fn create_hsvt_matrix(&self, page_matrix: DataFrame) -> Result<DataFrame, PolarsError>{
-        let num_cols_per_block = self.total_trailing_days/self.num_days_per_col;
-        let raw_column_names = page_matrix.get_column_names();
+        let num_cols_per_block = self.calculate_num_cols_per_block();
         let mut return_df = DataFrame::empty();
 
-        for x in (0..(num_cols_per_block)*(self.num_assets) - 1).step_by(num_cols_per_block.to_usize().expect("")) {
-            let current_asset_page_matrix = page_matrix.select_by_range(x.to_usize().expect("")..(x+num_cols_per_block).to_usize().expect(""))?;
-            print!("Current Page Matrix: {}", current_asset_page_matrix);
-            let col_names = current_asset_page_matrix.get_column_names();
-            let array_data = current_asset_page_matrix.to_ndarray::<Float64Type>(IndexOrder::Fortran)?;
-
-            let svd_data = NDArrayMath{}.svd(array_data);
-            if let Ok(data) = svd_data {
-                let filtered_svd = NDArrayMath{}.filter_svd_matrices(data, 0.0);
-                let rebuilt_matrix = NDArrayMath{}.rebuild_matrix_from_svd(filtered_svd).map(|&a| ((a*1000.0).round()/1000.0));
-                let df = NDArrayHelper{}.convert_ndarray_to_polars(rebuilt_matrix, self.convert_col_names_to_string(col_names))?;
-                for col in df.iter() {
-                    return_df = return_df.hstack(&[col.clone()])?;
-                }
-            }
-
+        for x in self.calculate_cols_to_index_on(&num_cols_per_block) {
+            return_df = self.append_partial_hsvt_matrix(x, page_matrix.clone(), return_df, num_cols_per_block)?;
         }
 
         return Ok(return_df)
+    }
+
+    fn calculate_num_cols_per_block(&self) -> i64 {
+        return self.total_trailing_days/self.num_days_per_col;
+    }
+
+    fn calculate_cols_to_index_on(&self, &num_cols_per_block: &i64) -> std::iter::StepBy<std::ops::Range<i64>> {
+        return (0..(num_cols_per_block)*(self.num_assets) - 1).step_by(num_cols_per_block.to_usize().expect(""))
+    }
+
+    fn append_partial_hsvt_matrix(&self, x: i64, page_matrix: DataFrame, mut return_df: DataFrame, num_cols_per_block: i64) -> Result<DataFrame, PolarsError> {
+        let current_asset_page_matrix = self.select_page_matrix_for_single_asset(page_matrix, x, num_cols_per_block)?;
+        let col_names = current_asset_page_matrix.get_column_names();
+        let array_data = current_asset_page_matrix.to_ndarray::<Float64Type>(IndexOrder::Fortran)?;
+
+        let svd_data = NDArrayMath{}.svd(array_data);
+        if let Ok(data) = svd_data {
+            let hsvt_asset = self.rebuild_hsvt_matrix(data, col_names)?;
+            for col in hsvt_asset.iter() {
+                return_df = return_df.hstack(&[col.clone()])?;
+            }
+        }
+        return Ok(return_df)
+    }
+
+    fn select_page_matrix_for_single_asset(&self, page_matrix: DataFrame, x: i64, num_cols_per_block: i64) -> Result<DataFrame, PolarsError> {
+        return page_matrix.select_by_range(x.to_usize().expect("")..(x+num_cols_per_block).to_usize().expect(""));
+
+    }
+
+    fn rebuild_hsvt_matrix(&self, data: super::analysis::analysis::SvdResponse, col_names: Vec<&str>) -> Result<DataFrame, PolarsError> {
+        let filtered_svd = NDArrayMath{}.filter_svd_matrices(data, self.hsvt_threshold);
+        let rebuilt_matrix = NDArrayMath{}.rebuild_matrix_from_svd(filtered_svd).map(|&a| ((a*1000.0).round()/1000.0));
+        let df = NDArrayHelper{}.convert_ndarray_to_polars(rebuilt_matrix, self.convert_col_names_to_string(col_names))?;
+        return Ok(df)
     }
     fn create_page_matrix(&self, cleaned_data: DataFrame) -> Result<DataFrame, PolarsError> {
 
@@ -188,21 +208,21 @@ mod tests {
     
     #[test]
     fn test_invoke_retrieve_data() {
-        let predictor = MssaPredictor{num_days_per_col:10, total_trailing_days: 10, num_assets: 10};
+        let predictor = MssaPredictor{num_days_per_col:10, total_trailing_days: 10, num_assets: 10, hsvt_threshold: 0.0};
         predictor.retrieve_formatted_data();
         assert!(true)
     }
 
     #[test]
     fn test_invoke_build_prediction_data(){
-        let predictor = MssaPredictor{num_days_per_col:10, total_trailing_days: 10, num_assets: 10};
+        let predictor = MssaPredictor{num_days_per_col:10, total_trailing_days: 10, num_assets: 10, hsvt_threshold: 0.0};
         predictor.build_prediction_data();
         assert!(true)
     }
 
     #[test]
     fn test_assert_build_prediction_data_correct() {
-        let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4, num_assets: 1};
+        let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4, num_assets: 1, hsvt_threshold: 0.0};
         let results = predictor.build_prediction_data();
         let expected_df = DataFrame::new(vec![
             Series::new("col1_1", &[4.0, 3.0]),
@@ -228,7 +248,7 @@ mod tests {
         
         let expected = array![2.0/7.0, 5.0/14.0];
 
-        let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4, num_assets: 1};
+        let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4, num_assets: 1, hsvt_threshold: 0.0};
         let predictions = predictor.train_data(input_a.transpose(None, None).expect("Good!"));
 
         assert_eq!(predictions.expect("Should build model").map(|&a| (a*1000.0).round()/1000.0), expected.map(|&a| num_traits::Float::round(a*1000.0)/1000.0))
