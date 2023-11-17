@@ -36,11 +36,10 @@ impl Predictor for MssaPredictor {
         )?;
         return Ok(df)
     }
-    fn create_predictions(&self) -> bool {
-        return true
+    fn create_predictions(&self) -> DataFrame {
+        return DataFrame::empty(); 
     }
-    fn build_prediction_data(&self) -> Result<DataFrame, PolarsError> {
-        let cleaned_data = self.retrieve_formatted_data()?;
+    fn build_prediction_data(&self, cleaned_data: DataFrame) -> Result<DataFrame, PolarsError> {
         let page_matrix = self.create_page_matrix(cleaned_data)?;
         let hsvt_matrix = self.create_hsvt_matrix(page_matrix)?;
         return Ok(hsvt_matrix);
@@ -216,17 +215,17 @@ mod tests {
     #[test]
     fn test_invoke_build_prediction_data(){
         let predictor = MssaPredictor{num_days_per_col:10, total_trailing_days: 10, num_assets: 10, hsvt_threshold: 0.0};
-        predictor.build_prediction_data();
+        predictor.build_prediction_data(predictor.retrieve_formatted_data().expect("Should have data"));
         assert!(true)
     }
 
     #[test]
     fn test_assert_build_prediction_data_correct() {
         let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4, num_assets: 1, hsvt_threshold: 0.0};
-        let results = predictor.build_prediction_data();
+        let results = predictor.build_prediction_data(predictor.retrieve_formatted_data().expect("Should have data"));
         let expected_df = DataFrame::new(vec![
             Series::new("col1_1", &[4.0, 3.0]),
-            Series::new("col1_2", &[0.0, -5.0]),
+            Series::new("col1_2", &[0.0, -5.0])
         ]).expect("Why didn't this work");
         match results {
            Ok(A) => {
@@ -235,6 +234,28 @@ mod tests {
             Err(B) => {
                 assert!(false)
             }
+        }
+    }
+
+    #[test]
+    fn test_assert_build_prediction_data_correct_more_data() {
+        let predictor = MssaPredictor{num_days_per_col: 2, total_trailing_days: 4, num_assets: 2, hsvt_threshold: 1.0};
+        let input = DataFrame::new(vec![
+            Series::new("col1", &[4.0, 0.0, 3.0, -5.0]),
+            Series::new("col2", &[5.0, 6.0, 7.0, 8.0])
+        ]).expect("STUFFFF");
+        let expected_df = DataFrame::new(vec![
+            Series::new("col1_1", &[0.0, 0.0]),
+            Series::new("col1_2", &[0.0, 0.0]),
+            Series::new("col2_1", &[0.0, 0.0]),
+            Series::new("col2_2", &[0.0, 0.0])
+        ]).expect("Stuffffffff");
+
+        let results = predictor.build_prediction_data(input);
+        if let Ok(data) = results {
+            assert_eq!(data, expected_df)
+        } else {
+            assert!(false)
         }
     }
 
@@ -253,6 +274,26 @@ mod tests {
 
         assert_eq!(predictions.expect("Should build model").map(|&a| (a*1000.0).round()/1000.0), expected.map(|&a| num_traits::Float::round(a*1000.0)/1000.0))
 
+    }
+
+    #[test]
+    fn create_predictions() {
+        let input_a = DataFrame::new(vec![
+            Series::new("col1_1", &[1.0, 2.0, 1.0]),
+            Series::new("col1_2", &[1.0, 5.0, 2.0]),
+            Series::new("col2_1", &[1.0, 7.0, 3.0]),
+            Series::new("col2_2", &[1.0, 8.0, 3.0])
+        ]).expect("Dataframe shouldn't be null");
+
+        let expected = DataFrame::new(vec![
+            Series::new("col1", &[2.0/7.0]),
+            Series::new("col2", &[5.0/14.0])
+        ]).expect("Expected shouldn't be null");
+
+        let predictor = MssaPredictor{num_days_per_col: 3, total_trailing_days: 6, num_assets:2, hsvt_threshold: 0.0};
+        let predictions = predictor.create_predictions();
+
+        assert_eq!(predictions, expected);
     }
 }
 

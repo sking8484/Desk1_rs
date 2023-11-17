@@ -11,7 +11,7 @@ impl<T: Predictor> PortfolioPredictor<T> {
     } 
 
     fn update_predictions(&self) -> bool {
-        self.prediction_methods.create_predictions()
+        return true
     }
 }
 
